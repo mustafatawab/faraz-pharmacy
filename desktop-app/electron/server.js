@@ -4,6 +4,8 @@ const { getDatabase } = require("./database");
 const crypto = require("crypto");
 const id = () => crypto.randomUUID();
 
+let serverInstance;
+
 function startServer(port) {
   const app = express();
   app.use(cors());
@@ -176,14 +178,14 @@ function startServer(port) {
     });
   });
 
-  app._server = app.listen(port, "0.0.0.0", () => {
+  serverInstance = app.listen(port, "0.0.0.0", () => {
     console.log(`[server] API server running on port ${port}`);
   });
   return app;
 }
 
 function stopServer() {
-  if (app._server) app._server.close();
+  if (serverInstance) serverInstance.close();
 }
 
 module.exports = { startServer, stopServer };

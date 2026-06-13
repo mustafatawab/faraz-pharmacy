@@ -5,15 +5,18 @@ const crypto = require("crypto");
 
 let db = null;
 
-const DATA_DIR = path.join(os.homedir(), ".faraz-pharmacy");
+function getDataDir() {
+  return process.env.FARAZ_DATA_DIR || path.join(os.homedir(), ".faraz-pharmacy");
+}
 
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  const dir = getDataDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
 function getDbPath() {
   ensureDataDir();
-  return path.join(DATA_DIR, "faraz-pharmacy.db");
+  return path.join(getDataDir(), "faraz-pharmacy.db");
 }
 
 function hashPassword(password) {
