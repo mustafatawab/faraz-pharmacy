@@ -2,8 +2,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Users, CreditCard,
-  Factory, Building2, Undo2, Wallet, BarChart3, LogOut, PillBottle, Receipt,
+  Factory, Building2, Undo2, Wallet, BarChart3, LogOut, Receipt,
 } from "lucide-react";
+import logo from "@/asset/image/logo.png";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -33,8 +34,8 @@ export default function Sidebar() {
   return (
     <aside className="w-[240px] h-full bg-surface border-r border-border flex flex-col shrink-0">
       <div className="flex items-center h-16 px-4 gap-3 border-b border-border">
-        <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
-          <PillBottle className="h-5 w-5 text-accent-foreground" />
+        <div className="h-14 w-14 shrink-0">
+          <img src={logo} alt="Faraz Pharmacy" className="h-full w-full object-cover" />
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text-primary truncate">Faraz Pharmacy</p>

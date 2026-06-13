@@ -28,7 +28,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: "Faraz Pharmacy",
-    icon: path.join(__dirname, "..", "assets", "icon.png"),
+    icon: path.join(__dirname, "..", "src", "asset", "image", "logo.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,

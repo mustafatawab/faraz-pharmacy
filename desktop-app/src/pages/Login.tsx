@@ -3,7 +3,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Monitor, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import logo from "@/asset/image/logo.png";
 
 export default function Login() {
   const { login } = useAuth();
@@ -25,13 +26,9 @@ export default function Login() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background p-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="h-14 w-14 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
-            <Monitor className="h-7 w-7 text-accent-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold text-text-primary">Faraz Pharmacy</h1>
-          <p className="text-sm text-text-secondary mt-1">Sign in to continue</p>
+      <div className="w-full max-w-md">
+        <div className="text-center">
+          <img src={logo} alt="Faraz Pharmacy" className="w-1/2 mx-auto" />
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -70,6 +67,7 @@ export default function Login() {
             {loading ? "Signing in..." : "Sign in"}
           </Button>
         </form>
+        <p className="text-center text-xs text-text-secondary mt-6">Developed by Mustafa Tawab</p>
       </div>
     </div>
   );
