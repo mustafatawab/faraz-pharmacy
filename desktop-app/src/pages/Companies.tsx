@@ -1,0 +1,141 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Building2, Phone, Package, Search, Plus, Pencil, Trash2 } from "lucide-react";
+import PageHeader from "@/components/shared/PageHeader";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api";
+import type { Company } from "@/types";
+
+export default function Companies() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: "", contact: "", phone: "", address: "" });
+
+  const { data: companies = [], isLoading } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
+
+  const filtered = companies.filter((c: Company) =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.contact.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const createMutation = useMutation({
+    mutationFn: () => api.companies.create(form),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      setOpen(false);
+      setForm({ name: "", contact: "", phone: "", address: "" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => api.companies.update(editingId!, form),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      setOpen(false);
+      setEditingId(null);
+      setForm({ name: "", contact: "", phone: "", address: "" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.companies.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["companies"] }),
+  });
+
+  function openAdd() {
+    setEditingId(null);
+    setForm({ name: "", contact: "", phone: "", address: "" });
+    setOpen(true);
+  }
+
+  function openEdit(c: Company) {
+    setEditingId(c.id);
+    setForm({ name: c.name, contact: c.contact, phone: c.phone, address: c.address });
+    setOpen(true);
+  }
+
+  return (
+    <div>
+      <PageHeader title="Companies" description="Manage pharmaceutical companies" action={{ label: "Add Company", onClick: openAdd }} />
+      <div className="relative max-w-sm mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+        <Input placeholder="Search companies..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
+        ) : filtered.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-sm text-text-secondary">No companies found</div>
+        ) : (
+          filtered.map((comp: Company) => (
+            <Card key={comp.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                      <Building2 className="h-5 w-5 text-accent" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-medium text-text-primary truncate">{comp.name}</h3>
+                      <p className="text-xs text-text-secondary mt-0.5">{comp.contact}</p>
+                      <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{comp.phone}</div>
+                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3" />{comp.product_count ?? 0} products</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => openEdit(comp)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors" title="Edit">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => { if (confirm("Delete this company?")) deleteMutation.mutate(comp.id); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      <Dialog open={open} onOpenChange={(v) => { if (!v) { setEditingId(null); } setOpen(v); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Edit Company" : "Add Company"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Name</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div>
+              <Label>Contact Person</Label>
+              <Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Phone</Label>
+                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div>
+                <Label>Address</Label>
+                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              </div>
+            </div>
+            <Button className="w-full" disabled={!form.name || createMutation.isPending || updateMutation.isPending}
+              onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
+              {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Company" : "Add Company"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
