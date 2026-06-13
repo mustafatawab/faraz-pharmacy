@@ -34,10 +34,6 @@ jobs:
         run: npm ci
         working-directory: desktop-app
 
-      - name: Rebuild native modules for Electron
-        run: npx @electron/rebuild
-        working-directory: desktop-app
-
       - name: Build renderer
         run: npm run build:renderer
         working-directory: desktop-app

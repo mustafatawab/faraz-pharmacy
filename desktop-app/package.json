@@ -1,9 +1,12 @@
 {
   "name": "faraz-pharmacy-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Faraz Pharmacy POS - Desktop Application",
+  "author": "Faraz Pharmacy",
+  "repository": "mustafatawab/faraz-pharmacy",
   "main": "electron/main.js",
   "scripts": {
+    "postinstall": "electron-builder install-app-deps",
     "dev": "concurrently \"npm run dev:renderer\" \"sleep 3 && npm run dev:electron\"",
     "dev:renderer": "vite",
     "dev:electron": "nodemon --watch electron -e js --exec \"NODE_ENV=development electron .\"",
