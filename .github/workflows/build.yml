@@ -42,8 +42,8 @@ jobs:
         run: npm run build:renderer
         working-directory: desktop-app
 
-      - name: Package app
-        run: npx electron-builder --publish=never
+      - name: Package and publish
+        run: npx electron-builder --publish=always
         working-directory: desktop-app
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
