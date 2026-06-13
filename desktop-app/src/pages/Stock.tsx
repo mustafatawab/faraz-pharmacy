@@ -11,17 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { api } from "@/lib/api";
-import type { StockPurchase, StockInput, Product, Distributor } from "@/types";
-
-const emptyForm = (): StockInput & { productId: string } => ({
-  productId: "", quantity: 0, purchasePrice: 0, expiry: undefined,
-});
+import type { StockPurchase, Product } from "@/types";
 
 export default function Stock() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ productId: "", quantity: "", purchasePrice: "", expiry: "" });
+  const [form, setForm] = useState({ productId: "", quantity: "", expiry: "" });
 
   const { data: stockEntries = [], isLoading } = useQuery({ queryKey: ["stock"], queryFn: api.stock.list });
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: api.products.list });
@@ -33,14 +29,13 @@ export default function Stock() {
     mutationFn: () => api.stock.create({
       productId: form.productId,
       quantity: Number(form.quantity),
-      purchasePrice: Number(form.purchasePrice),
       expiry: form.expiry || undefined,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setOpen(false);
-      setForm({ productId: "", quantity: "", purchasePrice: "", expiry: "" });
+      setForm({ productId: "", quantity: "", expiry: "" });
     },
   });
 
@@ -48,7 +43,6 @@ export default function Stock() {
     mutationFn: () => api.stock.update(editingId!, {
       productId: form.productId,
       quantity: Number(form.quantity),
-      purchasePrice: Number(form.purchasePrice),
       expiry: form.expiry || undefined,
     }),
     onSuccess: () => {
@@ -56,13 +50,13 @@ export default function Stock() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setOpen(false);
       setEditingId(null);
-      setForm({ productId: "", quantity: "", purchasePrice: "", expiry: "" });
+      setForm({ productId: "", quantity: "", expiry: "" });
     },
   });
 
   function openAdd() {
     setEditingId(null);
-    setForm({ productId: "", quantity: "", purchasePrice: "", expiry: "" });
+    setForm({ productId: "", quantity: "", expiry: "" });
     setOpen(true);
   }
 
@@ -71,7 +65,6 @@ export default function Stock() {
     setForm({
       productId: entry.product_id,
       quantity: String(entry.quantity),
-      purchasePrice: String(entry.purchase_price),
       expiry: entry.expiry || "",
     });
     setOpen(true);
@@ -119,21 +112,15 @@ export default function Stock() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Quantity</Label>
-                <Input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
-              </div>
-              <div>
-                <Label>Purchase Price</Label>
-                <Input type="number" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
-              </div>
+            <div>
+              <Label>Quantity</Label>
+              <Input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
             </div>
             <div>
               <Label>Expiry (optional)</Label>
               <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} />
             </div>
-            <Button className="w-full" disabled={!form.productId || !form.quantity || !form.purchasePrice || createMutation.isPending || updateMutation.isPending}
+            <Button className="w-full" disabled={!form.productId || !form.quantity || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Purchase" : "Record Purchase"}
             </Button>

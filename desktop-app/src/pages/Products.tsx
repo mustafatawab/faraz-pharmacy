@@ -9,19 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatDate, generateBarcode } from "@/lib/utils";
+import { formatCurrency, generateBarcode } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { Product } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/types";
 
 interface ProductForm {
   barcode: string; name: string; category: string; location: string;
-  salePrice: string; purchasePrice: string; stockQty: string; expiry: string;
+  salePrice: string; purchasePrice: string; expiry: string;
 }
 
 const emptyForm = (): ProductForm => ({
   barcode: generateBarcode(), name: "", category: "", location: "",
-  salePrice: "", purchasePrice: "", stockQty: "0", expiry: "",
+  salePrice: "", purchasePrice: "", expiry: "",
 });
 
 export default function Products() {
@@ -48,7 +48,7 @@ export default function Products() {
     mutationFn: () => api.products.create({
       barcode: form.barcode, name: form.name, category: form.category,
       location: form.location, salePrice: Number(form.salePrice),
-      purchasePrice: Number(form.purchasePrice), stockQty: Number(form.stockQty),
+      purchasePrice: Number(form.purchasePrice),
       expiry: form.expiry || undefined,
     }),
     onSuccess: (product) => {
@@ -62,7 +62,7 @@ export default function Products() {
     mutationFn: () => api.products.update(editingId!, {
       barcode: form.barcode, name: form.name, category: form.category,
       location: form.location, salePrice: Number(form.salePrice),
-      purchasePrice: Number(form.purchasePrice), stockQty: Number(form.stockQty),
+      purchasePrice: Number(form.purchasePrice),
       expiry: form.expiry || undefined,
     }),
     onSuccess: () => {
@@ -93,7 +93,7 @@ export default function Products() {
     setForm({
       barcode: product.barcode, name: product.name, category: product.category,
       location: product.location, salePrice: String(product.sale_price),
-      purchasePrice: String(product.purchase_price), stockQty: String(product.stock_qty),
+      purchasePrice: String(product.purchase_price),
       expiry: product.expiry || "",
     });
     setOpen(true);
@@ -214,15 +214,9 @@ export default function Products() {
                 <Input type="number" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Stock Qty</Label>
-                <Input type="number" value={form.stockQty} onChange={(e) => setForm({ ...form, stockQty: e.target.value })} />
-              </div>
-              <div>
-                <Label>Expiry</Label>
-                <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} />
-              </div>
+            <div>
+              <Label>Expiry (optional)</Label>
+              <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} />
             </div>
             <Button className="w-full mt-2" disabled={!form.name || !form.salePrice || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>

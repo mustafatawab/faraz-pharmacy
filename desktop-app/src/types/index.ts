@@ -25,7 +25,6 @@ export interface ProductInput {
   distributorId?: string;
   salePrice: number;
   purchasePrice: number;
-  stockQty: number;
   category?: string;
   location?: string;
   expiry?: string;
@@ -128,7 +127,6 @@ export interface StockInput {
   productId: string;
   distributorId?: string;
   quantity: number;
-  purchasePrice: number;
   expiry?: string;
 }
 

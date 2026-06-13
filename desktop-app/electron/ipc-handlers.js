@@ -86,11 +86,11 @@ function registerHandlers() {
   ipcMain.handle("products:get-by-barcode", (_, b) => getDatabase().prepare("SELECT * FROM products WHERE barcode = ?").get(b));
   ipcMain.handle("products:create", (_, p) => {
     const i = id();
-    getDatabase().prepare("INSERT INTO products (id,barcode,name,company,category,location,distributor_id,sale_price,purchase_price,stock_qty,expiry) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(i, p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, p.salePrice, p.purchasePrice, p.stockQty, p.expiry||null);
+    getDatabase().prepare("INSERT INTO products (id,barcode,name,company,category,location,distributor_id,sale_price,purchase_price,stock_qty,expiry) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(i, p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, p.salePrice, p.purchasePrice, p.stockQty ?? 0, p.expiry||null);
     return getDatabase().prepare("SELECT * FROM products WHERE id = ?").get(i);
   });
   ipcMain.handle("products:update", (_, id, p) => {
-    getDatabase().prepare("UPDATE products SET barcode=?,name=?,company=?,category=?,location=?,distributor_id=?,sale_price=?,purchase_price=?,stock_qty=?,expiry=? WHERE id=?").run(p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, p.salePrice, p.purchasePrice, p.stockQty, p.expiry||null, id);
+    getDatabase().prepare("UPDATE products SET barcode=?,name=?,company=?,category=?,location=?,distributor_id=?,sale_price=?,purchase_price=?,stock_qty=?,expiry=? WHERE id=?").run(p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, p.salePrice, p.purchasePrice, p.stockQty ?? 0, p.expiry||null, id);
     return getDatabase().prepare("SELECT * FROM products WHERE id = ?").get(id);
   });
   ipcMain.handle("products:delete", (_, id) => { getDatabase().prepare("DELETE FROM products WHERE id=?").run(id); return { success: true }; });
@@ -165,10 +165,13 @@ function registerHandlers() {
   // Stock
   ipcMain.handle("stock:list", () => getDatabase().prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id ORDER BY sp.created_at DESC").all());
   ipcMain.handle("stock:create", (_, p) => {
-    const db = getDatabase(); const i=id(); const tv=p.quantity*p.purchasePrice;
+    const db = getDatabase(); const i=id();
+    const product = db.prepare("SELECT purchase_price FROM products WHERE id=?").get(p.productId);
+    const price = p.purchasePrice ?? product?.purchase_price ?? 0;
+    const tv = p.quantity * price;
     db.transaction(()=>{
-      db.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,quantity,purchase_price,expiry,total_value) VALUES (?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.quantity, p.purchasePrice, p.expiry||null, tv);
-      db.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(p.quantity, p.purchasePrice, p.expiry||null, p.productId);
+      db.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,quantity,purchase_price,expiry,total_value) VALUES (?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.quantity, price, p.expiry||null, tv);
+      db.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(p.quantity, price, p.expiry||null, p.productId);
     })();
     return db.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id WHERE sp.id=?").get(i);
   });
@@ -177,10 +180,11 @@ function registerHandlers() {
     const old = db.prepare("SELECT * FROM stock_purchases WHERE id=?").get(id);
     if (!old) return { error: "Not found" };
     const qtyDiff = p.quantity - old.quantity;
-    const tv = p.quantity * p.purchasePrice;
+    const price = p.purchasePrice ?? old.purchase_price;
+    const tv = p.quantity * price;
     db.transaction(()=>{
-      db.prepare("UPDATE stock_purchases SET quantity=?, purchase_price=?, expiry=?, total_value=? WHERE id=?").run(p.quantity, p.purchasePrice, p.expiry||null, tv, id);
-      db.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(qtyDiff, p.purchasePrice, p.expiry||null, old.product_id);
+      db.prepare("UPDATE stock_purchases SET quantity=?, purchase_price=?, expiry=?, total_value=? WHERE id=?").run(p.quantity, price, p.expiry||null, tv, id);
+      db.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(qtyDiff, price, p.expiry||null, old.product_id);
     })();
     return db.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id WHERE sp.id=?").get(id);
   });
