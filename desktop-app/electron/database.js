@@ -122,6 +122,12 @@ function initializeDatabase() {
   try { db.exec("ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT ''"); } catch {}
   try { db.exec("ALTER TABLE products ADD COLUMN location TEXT NOT NULL DEFAULT ''"); } catch {}
   try { db.exec("ALTER TABLE products ADD COLUMN active INTEGER NOT NULL DEFAULT 1"); } catch {}
+  try { db.exec("ALTER TABLE customers ADD COLUMN address TEXT NOT NULL DEFAULT ''"); } catch {}
+  try { db.exec("ALTER TABLE companies ADD COLUMN second_number TEXT NOT NULL DEFAULT ''"); } catch {}
+  try { db.exec("ALTER TABLE distributors ADD COLUMN company_id TEXT REFERENCES companies(id)"); } catch {}
+  try { db.exec("ALTER TABLE products ADD COLUMN markup_percent REAL NOT NULL DEFAULT 20"); } catch {}
+  try { db.exec("ALTER TABLE stock_purchases ADD COLUMN company_id TEXT REFERENCES companies(id)"); } catch {}
+  try { db.exec("ALTER TABLE stock_purchases ADD COLUMN invoice_number TEXT NOT NULL DEFAULT ''"); } catch {}
 
   const userCount = db.prepare("SELECT COUNT(*) as c FROM users").get();
   if (userCount.c === 0) seed();

@@ -5,7 +5,7 @@ const { initializeDatabase } = require("./database");
 const { registerHandlers } = require("./ipc-handlers");
 const { startServer } = require("./server");
 const { loadConfig, saveConfig } = require("./config");
-const { printReceipt } = require("./printer");
+const { printReceipt, printReturnReceipt } = require("./printer");
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -70,6 +70,15 @@ app.whenReady().then(() => {
   ipcMain.handle("print:receipt", async (_, sale) => {
     try {
       await printReceipt(sale);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("print:return-receipt", async (_, returnData, sale) => {
+    try {
+      await printReturnReceipt(returnData, sale);
       return { success: true };
     } catch (e) {
       return { success: false, error: e.message };

@@ -86,11 +86,16 @@ function registerHandlers() {
   ipcMain.handle("products:get-by-barcode", (_, b) => getDatabase().prepare("SELECT * FROM products WHERE barcode = ?").get(b));
   ipcMain.handle("products:create", (_, p) => {
     const i = id();
-    getDatabase().prepare("INSERT INTO products (id,barcode,name,company,category,location,distributor_id,sale_price,purchase_price,stock_qty,expiry) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(i, p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, p.salePrice, p.purchasePrice, p.stockQty ?? 0, p.expiry||null);
+    const mp = p.markupPercent ?? 20;
+    const sp = p.salePrice > 0 ? p.salePrice : Math.round(p.purchasePrice * (1 + mp / 100));
+    getDatabase().prepare("INSERT INTO products (id,barcode,name,company,category,location,distributor_id,sale_price,purchase_price,markup_percent,stock_qty,expiry) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").run(i, p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, sp, p.purchasePrice, mp, p.stockQty ?? 0, p.expiry||null);
     return getDatabase().prepare("SELECT * FROM products WHERE id = ?").get(i);
   });
   ipcMain.handle("products:update", (_, id, p) => {
-    getDatabase().prepare("UPDATE products SET barcode=?,name=?,company=?,category=?,location=?,distributor_id=?,sale_price=?,purchase_price=?,stock_qty=?,expiry=? WHERE id=?").run(p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, p.salePrice, p.purchasePrice, p.stockQty ?? 0, p.expiry||null, id);
+    const old = getDatabase().prepare("SELECT * FROM products WHERE id = ?").get(id);
+    const mp = p.markupPercent ?? old?.markup_percent ?? 20;
+    const sp = p.salePrice > 0 ? p.salePrice : Math.round(p.purchasePrice * (1 + mp / 100));
+    getDatabase().prepare("UPDATE products SET barcode=?,name=?,company=?,category=?,location=?,distributor_id=?,sale_price=?,purchase_price=?,markup_percent=?,stock_qty=?,expiry=? WHERE id=?").run(p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, sp, p.purchasePrice, mp, p.stockQty ?? 0, p.expiry||null, id);
     return getDatabase().prepare("SELECT * FROM products WHERE id = ?").get(id);
   });
   ipcMain.handle("products:delete", (_, id) => { getDatabase().prepare("DELETE FROM products WHERE id=?").run(id); return { success: true }; });
@@ -114,18 +119,30 @@ function registerHandlers() {
     tr();
     return db.prepare("SELECT * FROM sales WHERE id=?").get(sid);
   });
-  ipcMain.handle("sales:list-recent", (_, l=10) => getDatabase().prepare("SELECT s.*, c.name as customer_name FROM sales s LEFT JOIN customers c ON s.customer_id=c.id ORDER BY s.created_at DESC LIMIT ?").all(l));
+  ipcMain.handle("sales:list-recent", (_, l=10) => getDatabase().prepare("SELECT s.*, c.name as customer_name, (SELECT COUNT(*) FROM returns WHERE sale_id=s.id) as return_count FROM sales s LEFT JOIN customers c ON s.customer_id=c.id ORDER BY s.created_at DESC LIMIT ?").all(l));
   ipcMain.handle("sales:get-by-id", (_, id) => {
-    const s = getDatabase().prepare("SELECT s.*, c.name as customer_name FROM sales s LEFT JOIN customers c ON s.customer_id=c.id WHERE s.id=?").get(id);
+    const s = getDatabase().prepare("SELECT s.*, c.name as customer_name, (SELECT COUNT(*) FROM returns WHERE sale_id=s.id) as return_count FROM sales s LEFT JOIN customers c ON s.customer_id=c.id WHERE s.id=?").get(id);
     if (s) s.items = getDatabase().prepare("SELECT * FROM sale_items WHERE sale_id=?").all(id);
     return s;
+  });
+  ipcMain.handle("sales:list-by-date", (_, dateStr) => {
+    return getDatabase().prepare("SELECT s.*, c.name as customer_name, (SELECT COUNT(*) FROM returns WHERE sale_id=s.id) as return_count FROM sales s LEFT JOIN customers c ON s.customer_id=c.id WHERE date(s.created_at)=? ORDER BY s.created_at DESC").all(dateStr);
+  });
+  ipcMain.handle("sales:list-all", (_, opts = {}) => {
+    const { search, dateFrom, dateTo } = opts;
+    let q = "SELECT s.*, c.name as customer_name, (SELECT COUNT(*) FROM sale_items WHERE sale_id=s.id) as item_count, (SELECT COUNT(*) FROM returns WHERE sale_id=s.id) as return_count FROM sales s LEFT JOIN customers c ON s.customer_id=c.id WHERE 1=1";
+    const p = [];
+    if (dateFrom) { q += " AND date(s.created_at) >= ?"; p.push(dateFrom); }
+    if (dateTo) { q += " AND date(s.created_at) <= ?"; p.push(dateTo); }
+    if (search) { const s = `%${search}%`; q += " AND (s.id LIKE ? OR c.name LIKE ?)"; p.push(s, s); }
+    return getDatabase().prepare(q + " ORDER BY s.created_at DESC LIMIT 500").all(...p);
   });
 
   // Customers
   ipcMain.handle("customers:list", () => getDatabase().prepare("SELECT c.*, (SELECT COUNT(*) FROM sales WHERE customer_id=c.id) as total_purchases, (SELECT COALESCE(SUM(balance_due),0) FROM arrears WHERE customer_id=c.id AND status='pending') as outstanding_arrear, (SELECT MAX(created_at) FROM sales WHERE customer_id=c.id) as last_purchase FROM customers c ORDER BY c.name").all());
   ipcMain.handle("customers:search", (_, q) => { const s=`%${q}%`; return getDatabase().prepare("SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name LIMIT 20").all(s,s); });
-  ipcMain.handle("customers:create", (_, c) => { const i=id(); getDatabase().prepare("INSERT INTO customers (id,name,phone) VALUES (?,?,?)").run(i,c.name,c.phone); return getDatabase().prepare("SELECT * FROM customers WHERE id=?").get(i); });
-  ipcMain.handle("customers:update", (_, id, c) => { getDatabase().prepare("UPDATE customers SET name=?, phone=? WHERE id=?").run(c.name, c.phone, id); return getDatabase().prepare("SELECT * FROM customers WHERE id=?").get(id); });
+  ipcMain.handle("customers:create", (_, c) => { const i=id(); getDatabase().prepare("INSERT INTO customers (id,name,phone,address) VALUES (?,?,?,?)").run(i,c.name,c.phone,c.address||""); return getDatabase().prepare("SELECT * FROM customers WHERE id=?").get(i); });
+  ipcMain.handle("customers:update", (_, id, c) => { getDatabase().prepare("UPDATE customers SET name=?, phone=?, address=? WHERE id=?").run(c.name, c.phone, c.address||"", id); return getDatabase().prepare("SELECT * FROM customers WHERE id=?").get(id); });
   ipcMain.handle("customers:delete", (_, id) => { getDatabase().prepare("DELETE FROM customers WHERE id=?").run(id); return { success: true }; });
   ipcMain.handle("customers:get-by-id", (_, id) => {
     const c = getDatabase().prepare("SELECT c.*, (SELECT COUNT(*) FROM sales WHERE customer_id=c.id) as total_purchases, (SELECT COALESCE(SUM(balance_due),0) FROM arrears WHERE customer_id=c.id AND status='pending') as outstanding_arrear FROM customers c WHERE c.id=?").get(id);
@@ -163,17 +180,17 @@ function registerHandlers() {
   });
 
   // Stock
-  ipcMain.handle("stock:list", () => getDatabase().prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id ORDER BY sp.created_at DESC").all());
+  ipcMain.handle("stock:list", () => getDatabase().prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id ORDER BY sp.created_at DESC").all());
   ipcMain.handle("stock:create", (_, p) => {
     const db = getDatabase(); const i=id();
     const product = db.prepare("SELECT purchase_price FROM products WHERE id=?").get(p.productId);
     const price = p.purchasePrice ?? product?.purchase_price ?? 0;
     const tv = p.quantity * price;
     db.transaction(()=>{
-      db.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,quantity,purchase_price,expiry,total_value) VALUES (?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.quantity, price, p.expiry||null, tv);
+      db.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,company_id,invoice_number,quantity,purchase_price,expiry,total_value) VALUES (?,?,?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.companyId||null, p.invoiceNumber||"", p.quantity, price, p.expiry||null, tv);
       db.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(p.quantity, price, p.expiry||null, p.productId);
     })();
-    return db.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id WHERE sp.id=?").get(i);
+    return db.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id WHERE sp.id=?").get(i);
   });
   ipcMain.handle("stock:update", (_, id, p) => {
     const db = getDatabase();
@@ -183,28 +200,31 @@ function registerHandlers() {
     const price = p.purchasePrice ?? old.purchase_price;
     const tv = p.quantity * price;
     db.transaction(()=>{
-      db.prepare("UPDATE stock_purchases SET quantity=?, purchase_price=?, expiry=?, total_value=? WHERE id=?").run(p.quantity, price, p.expiry||null, tv, id);
+      db.prepare("UPDATE stock_purchases SET quantity=?, purchase_price=?, expiry=?, total_value=?, company_id=?, invoice_number=?, distributor_id=? WHERE id=?").run(p.quantity, price, p.expiry||null, tv, p.companyId||null, p.invoiceNumber||"", p.distributorId||null, id);
       db.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(qtyDiff, price, p.expiry||null, old.product_id);
     })();
-    return db.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id WHERE sp.id=?").get(id);
+    return db.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id WHERE sp.id=?").get(id);
   });
 
   // Distributors
-  ipcMain.handle("distributors:list", () => getDatabase().prepare("SELECT d.*, (SELECT COUNT(*) FROM products WHERE distributor_id=d.id) as product_count FROM distributors d ORDER BY d.name").all());
-  ipcMain.handle("distributors:create", (_, d) => { const i=id(); getDatabase().prepare("INSERT INTO distributors (id,name,contact,phone,address) VALUES (?,?,?,?,?)").run(i,d.name,d.contact,d.phone,d.address||""); return getDatabase().prepare("SELECT * FROM distributors WHERE id=?").get(i); });
-  ipcMain.handle("distributors:update", (_, id, d) => { getDatabase().prepare("UPDATE distributors SET name=?, contact=?, phone=?, address=? WHERE id=?").run(d.name, d.contact, d.phone, d.address, id); return getDatabase().prepare("SELECT * FROM distributors WHERE id=?").get(id); });
+  ipcMain.handle("distributors:list", () => getDatabase().prepare("SELECT d.*, c.name as company_name, (SELECT COUNT(*) FROM products WHERE distributor_id=d.id) as product_count FROM distributors d LEFT JOIN companies c ON d.company_id=c.id ORDER BY d.name").all());
+  ipcMain.handle("distributors:create", (_, d) => { const i=id(); getDatabase().prepare("INSERT INTO distributors (id,name,contact,phone,address,company_id) VALUES (?,?,?,?,?,?)").run(i,d.name,d.contact,d.phone,d.address||"",d.companyId||null); return getDatabase().prepare("SELECT d.*, c.name as company_name FROM distributors d LEFT JOIN companies c ON d.company_id=c.id WHERE d.id=?").get(i); });
+  ipcMain.handle("distributors:update", (_, id, d) => { getDatabase().prepare("UPDATE distributors SET name=?, contact=?, phone=?, address=?, company_id=? WHERE id=?").run(d.name, d.contact, d.phone, d.address, d.companyId||null, id); return getDatabase().prepare("SELECT d.*, c.name as company_name FROM distributors d LEFT JOIN companies c ON d.company_id=c.id WHERE d.id=?").get(id); });
   ipcMain.handle("distributors:delete", (_, id) => { getDatabase().prepare("DELETE FROM distributors WHERE id=?").run(id); return { success: true }; });
 
   // Companies
   ipcMain.handle("companies:list", () => getDatabase().prepare("SELECT c.*, (SELECT COUNT(*) FROM products WHERE company=c.name) as product_count FROM companies c ORDER BY c.name").all());
-  ipcMain.handle("companies:create", (_, c) => { const i=id(); getDatabase().prepare("INSERT INTO companies (id,name,contact,phone,address) VALUES (?,?,?,?,?)").run(i,c.name,c.contact,c.phone,c.address||""); return getDatabase().prepare("SELECT * FROM companies WHERE id=?").get(i); });
-  ipcMain.handle("companies:update", (_, id, c) => { getDatabase().prepare("UPDATE companies SET name=?, contact=?, phone=?, address=? WHERE id=?").run(c.name, c.contact, c.phone, c.address, id); return getDatabase().prepare("SELECT * FROM companies WHERE id=?").get(id); });
+  ipcMain.handle("companies:create", (_, c) => { const i=id(); getDatabase().prepare("INSERT INTO companies (id,name,contact,phone,address,second_number) VALUES (?,?,?,?,?,?)").run(i,c.name,c.contact,c.phone,c.address||"",c.second_number||""); return getDatabase().prepare("SELECT * FROM companies WHERE id=?").get(i); });
+  ipcMain.handle("companies:update", (_, id, c) => { getDatabase().prepare("UPDATE companies SET name=?, contact=?, phone=?, address=?, second_number=? WHERE id=?").run(c.name, c.contact, c.phone, c.address, c.second_number||"", id); return getDatabase().prepare("SELECT * FROM companies WHERE id=?").get(id); });
   ipcMain.handle("companies:delete", (_, id) => { getDatabase().prepare("DELETE FROM companies WHERE id=?").run(id); return { success: true }; });
 
   // Returns
   ipcMain.handle("returns:list", () => getDatabase().prepare("SELECT * FROM returns ORDER BY created_at DESC").all());
   ipcMain.handle("returns:create", (_, r) => {
-    const db=getDatabase(); const ri=id();
+    const db=getDatabase();
+    const existing = db.prepare("SELECT COUNT(*) as c FROM returns WHERE sale_id=?").get(r.saleId);
+    if (existing.c > 0) throw new Error("This sale has already been returned");
+    const ri=id();
     db.transaction(()=>{
       db.prepare("INSERT INTO returns (id,sale_id,refund_amount,reason) VALUES (?,?,?,?)").run(ri, r.saleId, r.refundAmount, r.reason);
       const ii=db.prepare("INSERT INTO return_items (id,return_id,product_id,product_name,quantity,refund_amount) VALUES (?,?,?,?,?,?)");

@@ -1,19 +1,28 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Plus, Trash2, CheckCircle } from "lucide-react";
+import { CreditCard, Plus, Trash2, CheckCircle, Lock } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import StatCard from "@/components/shared/StatCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { Arrear, Customer } from "@/types";
+
+async function verifyAdminPassword(password: string): Promise<boolean> {
+  try {
+    const res = await window.authLogin({ username: "", password });
+    return !res.error;
+  } catch {
+    return false;
+  }
+}
 
 export default function Arrears() {
   const queryClient = useQueryClient();
@@ -22,6 +31,9 @@ export default function Arrears() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ customerId: "", totalBill: "", amountPaid: "" });
+  const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; action: "pay" | "settle" | "delete"; targetId: string; payAmount?: number }>({ open: false, action: "pay", targetId: "" });
+  const [adminPassword, setAdminPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   const { data: arrears = [], isLoading } = useQuery({
     queryKey: ["arrears", filter],
@@ -71,6 +83,25 @@ export default function Arrears() {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
   });
+
+  async function handleAdminAction(action: "pay" | "settle" | "delete") {
+    setPasswordError("");
+    const ok = await verifyAdminPassword(adminPassword);
+    if (!ok) {
+      setPasswordError("Incorrect admin password");
+      return;
+    }
+    const { targetId, payAmount } = passwordDialog;
+    if (action === "pay" && payAmount) {
+      recordPayment.mutate({ id: targetId, amount: payAmount });
+    } else if (action === "settle") {
+      settleMutation.mutate(targetId);
+    } else if (action === "delete") {
+      deleteMutation.mutate(targetId);
+    }
+    setPasswordDialog({ open: false, action: "pay", targetId: "" });
+    setAdminPassword("");
+  }
 
   const totalOutstanding = arrears.filter((a: Arrear) => a.status === "pending").reduce((s: number, a: Arrear) => s + a.balance_due, 0);
 
@@ -125,20 +156,20 @@ export default function Arrears() {
                           {payingId === arrear.id ? (
                             <>
                               <Input type="number" placeholder="Amount" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="h-8 w-24 text-sm font-mono" autoFocus />
-                              <Button size="sm" className="h-8" onClick={() => recordPayment.mutate({ id: arrear.id, amount: Number(paymentAmount) })} disabled={!paymentAmount}>Pay</Button>
+                              <Button size="sm" className="h-8" onClick={() => { setPasswordDialog({ open: true, action: "pay", targetId: arrear.id, payAmount: Number(paymentAmount) }); setAdminPassword(""); }} disabled={!paymentAmount}>Pay</Button>
                               <Button size="sm" variant="ghost" className="h-8" onClick={() => setPayingId(null)}>Cancel</Button>
                             </>
                           ) : (
                             <>
                               <Button size="sm" variant="outline" className="h-8" onClick={() => setPayingId(arrear.id)}>Record Payment</Button>
-                              <button onClick={() => settleMutation.mutate(arrear.id)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-success hover:bg-success/5 transition-colors" title="Mark Settled">
+                              <button onClick={() => { setPasswordDialog({ open: true, action: "settle", targetId: arrear.id }); setAdminPassword(""); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-success hover:bg-success/5 transition-colors" title="Mark Settled">
                                 <CheckCircle className="h-3.5 w-3.5" />
                               </button>
                             </>
                           )}
                         </>
                       )}
-                      <button onClick={() => { if (confirm("Delete this arrear?")) deleteMutation.mutate(arrear.id); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
+                      <button onClick={() => { setPasswordDialog({ open: true, action: "delete", targetId: arrear.id }); setAdminPassword(""); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -156,14 +187,12 @@ export default function Arrears() {
           <div className="space-y-3">
             <div>
               <Label>Customer</Label>
-              <Select value={form.customerId} onValueChange={(v) => setForm({ ...form, customerId: v })}>
-                <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
-                <SelectContent>
-                  {customers.map((c: Customer) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name} ({c.phone})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={customers.map((c: Customer) => ({ value: c.id, label: `${c.name} (${c.phone})` }))}
+                value={form.customerId}
+                onChange={(v) => setForm({ ...form, customerId: v })}
+                placeholder="Select customer"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -178,6 +207,33 @@ export default function Arrears() {
             <Button className="w-full" disabled={!form.customerId || !form.totalBill || createMutation.isPending} onClick={() => createMutation.mutate()}>
               {createMutation.isPending ? "Adding..." : "Add Arrear"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={passwordDialog.open} onOpenChange={(o) => setPasswordDialog({ ...passwordDialog, open: o })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Admin Password Required
+            </DialogTitle>
+            <DialogDescription>Enter your admin password to confirm this action.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="Enter password"
+                autoFocus
+              />
+            </div>
+            {passwordError && <p className="text-sm text-danger">{passwordError}</p>}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setPasswordDialog({ open: false, action: "pay", targetId: "" })}>Cancel</Button>
+              <Button onClick={() => handleAdminAction(passwordDialog.action)} disabled={!adminPassword}>Confirm</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

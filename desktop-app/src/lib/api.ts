@@ -47,6 +47,12 @@ const api = {
       isClient() ? fetchJson("GET", `/api/sales/recent?limit=${l}`) : window.electronAPI.sales.listRecent(l),
     getById: (id: string): Promise<Sale | null> =>
       isClient() ? fetchJson("GET", `/api/sales/${id}`) : window.electronAPI.sales.getById(id),
+    listByDate: (dateStr: string): Promise<Sale[]> =>
+      isClient() ? fetchJson("GET", `/api/sales/date/${dateStr}`) : window.electronAPI.sales.listByDate(dateStr),
+    listAll: (opts?: { search?: string; dateFrom?: string; dateTo?: string }): Promise<Sale[]> => {
+      const params = opts ? "?" + new URLSearchParams(Object.fromEntries(Object.entries(opts).filter(([_, v]) => v))).toString() : "";
+      return isClient() ? fetchJson("GET", `/api/sales${params}`) : window.electronAPI.sales.listAll(opts);
+    },
   },
   customers: {
     list: (): Promise<Customer[]> =>

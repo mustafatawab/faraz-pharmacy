@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Phone, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, ShoppingBag } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,6 +55,12 @@ export default function CustomerDetail() {
             <Phone className="h-3.5 w-3.5" />
             {customer.phone}
           </div>
+          {customer.address && (
+            <div className="flex items-center gap-2 mt-1 text-sm text-text-secondary">
+              <MapPin className="h-3.5 w-3.5" />
+              {customer.address}
+            </div>
+          )}
         </div>
       </div>
 

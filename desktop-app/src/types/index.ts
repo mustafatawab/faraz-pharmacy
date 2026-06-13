@@ -13,6 +13,7 @@ export interface Product {
   distributor_id?: string;
   sale_price: number;
   purchase_price: number;
+  markup_percent: number;
   stock_qty: number;
   expiry?: string;
   active: number;
@@ -25,6 +26,7 @@ export interface ProductInput {
   distributorId?: string;
   salePrice: number;
   purchasePrice: number;
+  markupPercent?: number;
   category?: string;
   location?: string;
   expiry?: string;
@@ -34,6 +36,7 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  address: string;
   created_at: string;
   total_purchases?: number;
   outstanding_arrear?: number;
@@ -45,6 +48,7 @@ export interface Customer {
 export interface CustomerInput {
   name: string;
   phone?: string;
+  address?: string;
 }
 
 export interface Sale {
@@ -58,6 +62,7 @@ export interface Sale {
   change: number;
   status: string;
   created_at: string;
+  return_count?: number;
   items?: SaleItem[];
 }
 
@@ -116,6 +121,9 @@ export interface StockPurchase {
   product_name?: string;
   distributor_id?: string;
   distributor_name?: string;
+  company_id?: string;
+  company_name?: string;
+  invoice_number: string;
   quantity: number;
   purchase_price: number;
   expiry?: string;
@@ -126,6 +134,9 @@ export interface StockPurchase {
 export interface StockInput {
   productId: string;
   distributorId?: string;
+  companyId?: string;
+  invoiceNumber?: string;
+  purchasePrice?: number;
   quantity: number;
   expiry?: string;
 }
@@ -136,6 +147,8 @@ export interface Distributor {
   contact: string;
   phone: string;
   address: string;
+  company_id?: string;
+  company_name?: string;
   created_at: string;
   product_count?: number;
 }
@@ -145,6 +158,7 @@ export interface DistributorInput {
   contact?: string;
   phone?: string;
   address?: string;
+  companyId?: string;
 }
 
 export interface Company {
@@ -153,6 +167,7 @@ export interface Company {
   contact: string;
   phone: string;
   address: string;
+  second_number: string;
   created_at: string;
   product_count?: number;
 }
@@ -162,6 +177,7 @@ export interface CompanyInput {
   contact?: string;
   phone?: string;
   address?: string;
+  second_number?: string;
 }
 
 export interface ReturnEntry {
@@ -184,6 +200,11 @@ export interface ReturnInput {
   refundAmount: number;
   reason: string;
   items: ReturnItemInput[];
+}
+
+export interface ReturnResult extends ReturnEntry {
+  items?: ReturnItemInput[];
+  reason?: string;
 }
 
 export interface Expense {

@@ -10,6 +10,7 @@ import RevenueChart from "@/components/dashboard/RevenueChart";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { downloadCSV, downloadPDF } from "@/lib/export";
 import type { Product, Expense, Sale, ReturnEntry, Arrear } from "@/types";
 
 export default function Reports() {
@@ -120,7 +121,14 @@ export default function Reports() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold">Revenue Trend (7 days)</CardTitle>
-              <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1" />Export</Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => downloadCSV(`sales_report_${dateRange.from}_${dateRange.to}.csv`, ["Date","Customer","Items","Subtotal","Discount","Total","Paid","Change","Status"], filteredSales.map((s: Sale) => [s.created_at, s.customer_name||"Walk-in", s.items?.length||0, s.subtotal, s.discount, s.total, s.amount_paid, s.change, s.status]))}>
+                  <Download className="h-4 w-4 mr-1" />CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => downloadPDF(`sales_report_${dateRange.from}_${dateRange.to}.pdf`, "Sales Report", ["Date","Customer","Subtotal","Discount","Total","Paid","Status"], filteredSales.map((s: Sale) => [s.created_at, s.customer_name||"Walk-in", s.subtotal, s.discount, s.total, s.amount_paid, s.status]))}>
+                  <Download className="h-4 w-4 mr-1" />PDF
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <RevenueChart />
@@ -129,6 +137,14 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="stock">
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="outline" size="sm" onClick={() => downloadCSV(`stock_report_${dateRange.from}_${dateRange.to}.csv`, ["Product","Stock","Expiry","Days Left"], [...lowStockProducts.map((p: Product) => [p.name, p.stock_qty, p.expiry||"", ""]), ...expiringProducts.map((p: Product) => [p.name, p.stock_qty, p.expiry||"", Math.ceil((new Date(p.expiry!).getTime() - Date.now()) / 86400000)])])}>
+              <Download className="h-4 w-4 mr-1" />CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadPDF(`stock_report_${dateRange.from}_${dateRange.to}.pdf`, "Stock Report", ["Product","Stock","Expiry","Days Left"], [...lowStockProducts.map((p: Product) => [p.name, p.stock_qty, p.expiry||"", ""]), ...expiringProducts.map((p: Product) => [p.name, p.stock_qty, p.expiry||"", Math.ceil((new Date(p.expiry!).getTime() - Date.now()) / 86400000)])])}>
+              <Download className="h-4 w-4 mr-1" />PDF
+            </Button>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader><CardTitle className="text-base font-semibold text-warning flex items-center gap-2"><Package className="h-4 w-4" />Low Stock Items (&le;5)</CardTitle></CardHeader>
@@ -191,6 +207,14 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="expense">
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="outline" size="sm" onClick={() => downloadCSV(`expense_report_${dateRange.from}_${dateRange.to}.csv`, ["Title","Category","Amount","Date"], filteredExpenses.map((e: Expense) => [e.title, e.category, e.amount, e.date]))}>
+              <Download className="h-4 w-4 mr-1" />CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadPDF(`expense_report_${dateRange.from}_${dateRange.to}.pdf`, "Expense Report", ["Title","Category","Amount","Date"], filteredExpenses.map((e: Expense) => [e.title, e.category, e.amount, e.date]))}>
+              <Download className="h-4 w-4 mr-1" />PDF
+            </Button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <Card>
               <CardHeader className="flex flex-row items-center gap-3 pb-2">
@@ -243,6 +267,14 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="returns">
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="outline" size="sm" onClick={() => downloadCSV(`returns_report_${dateRange.from}_${dateRange.to}.csv`, ["Date","Sale ID","Refund","Reason"], filteredReturns.map((r: ReturnEntry) => [r.created_at, r.sale_id, r.refund_amount, r.reason]))}>
+              <Download className="h-4 w-4 mr-1" />CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadPDF(`returns_report_${dateRange.from}_${dateRange.to}.pdf`, "Returns Report", ["Date","Sale ID","Refund","Reason"], filteredReturns.map((r: ReturnEntry) => [r.created_at, r.sale_id, r.refund_amount, r.reason]))}>
+              <Download className="h-4 w-4 mr-1" />PDF
+            </Button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <Card>
               <CardHeader className="flex flex-row items-center gap-3 pb-2">
@@ -295,6 +327,14 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="arrears">
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="outline" size="sm" onClick={() => downloadCSV(`arrears_report_${dateRange.from}_${dateRange.to}.csv`, ["Customer","Date","Total Bill","Paid","Balance","Status"], filteredArrears.map((a: Arrear) => [a.customer_name||"", a.created_at, a.total_bill, a.amount_paid, a.balance_due, a.status]))}>
+              <Download className="h-4 w-4 mr-1" />CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadPDF(`arrears_report_${dateRange.from}_${dateRange.to}.pdf`, "Arrears Report", ["Customer","Date","Total Bill","Paid","Balance","Status"], filteredArrears.map((a: Arrear) => [a.customer_name||"", a.created_at, a.total_bill, a.amount_paid, a.balance_due, a.status]))}>
+              <Download className="h-4 w-4 mr-1" />PDF
+            </Button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <Card>
               <CardHeader className="flex flex-row items-center gap-3 pb-2">

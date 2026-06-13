@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     create: (s) => ipcRenderer.invoke("sales:create", s),
     listRecent: (l) => ipcRenderer.invoke("sales:list-recent", l),
     getById: (id) => ipcRenderer.invoke("sales:get-by-id", id),
+    listByDate: (d) => ipcRenderer.invoke("sales:list-by-date", d),
+    listAll: (o) => ipcRenderer.invoke("sales:list-all", o),
   },
   customers: {
     list: () => ipcRenderer.invoke("customers:list"),
@@ -69,6 +71,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 contextBridge.exposeInMainWorld("saveConfig", (cfg) => ipcRenderer.invoke("config:save", cfg));
 contextBridge.exposeInMainWorld("getServerIp", () => ipcRenderer.invoke("server:ip"));
 contextBridge.exposeInMainWorld("printReceipt", (sale) => ipcRenderer.invoke("print:receipt", sale));
+contextBridge.exposeInMainWorld("printReturnReceipt", (returnData, sale) => ipcRenderer.invoke("print:return-receipt", returnData, sale));
 contextBridge.exposeInMainWorld("authLogin", (creds) => ipcRenderer.invoke("auth:login", creds));
 contextBridge.exposeInMainWorld("authLogout", (data) => ipcRenderer.invoke("auth:logout", data));
 contextBridge.exposeInMainWorld("authRefresh", (data) => ipcRenderer.invoke("auth:refresh", data));

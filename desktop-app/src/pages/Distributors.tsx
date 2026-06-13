@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Factory, Phone, Package, Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Factory, Building2, Phone, Package, Search, Plus, Pencil, Trash2, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
-import type { Distributor } from "@/types";
+import { downloadCSV, downloadPDF } from "@/lib/export";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { Distributor, Company } from "@/types";
 
 export default function Distributors() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", contact: "", phone: "", address: "" });
+  const [form, setForm] = useState({ name: "", contact: "", phone: "", address: "", companyId: "" });
 
   const { data: distributors = [], isLoading } = useQuery({ queryKey: ["distributors"], queryFn: api.distributors.list });
+  const { data: companies = [] } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
 
   const filtered = distributors.filter((d: Distributor) =>
     !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.contact.toLowerCase().includes(search.toLowerCase())
@@ -29,7 +32,7 @@ export default function Distributors() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["distributors"] });
       setOpen(false);
-      setForm({ name: "", contact: "", phone: "", address: "" });
+      setForm({ name: "", contact: "", phone: "", address: "", companyId: "" });
     },
   });
 
@@ -39,7 +42,7 @@ export default function Distributors() {
       queryClient.invalidateQueries({ queryKey: ["distributors"] });
       setOpen(false);
       setEditingId(null);
-      setForm({ name: "", contact: "", phone: "", address: "" });
+      setForm({ name: "", contact: "", phone: "", address: "", companyId: "" });
     },
   });
 
@@ -50,22 +53,30 @@ export default function Distributors() {
 
   function openAdd() {
     setEditingId(null);
-    setForm({ name: "", contact: "", phone: "", address: "" });
+    setForm({ name: "", contact: "", phone: "", address: "", companyId: "" });
     setOpen(true);
   }
 
   function openEdit(d: Distributor) {
     setEditingId(d.id);
-    setForm({ name: d.name, contact: d.contact, phone: d.phone, address: d.address });
+    setForm({ name: d.name, contact: d.contact, phone: d.phone, address: d.address, companyId: d.company_id || "" });
     setOpen(true);
   }
 
   return (
     <div>
       <PageHeader title="Distributors" description="Manage your supplier network" action={{ label: "Add Distributor", onClick: openAdd }} />
-      <div className="relative max-w-sm mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-        <Input placeholder="Search distributors..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex items-center gap-2 mb-6">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+          <Input placeholder="Search distributors..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => downloadCSV(`distributors_${new Date().toISOString().split("T")[0]}.csv`, ["Name","Contact","Phone","Address","Company","Products"], filtered.map((d: Distributor) => [d.name, d.contact, d.phone, d.address, d.company_name||"", d.product_count||0]))}>
+          <Download className="h-4 w-4 mr-1" /> CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadPDF(`distributors_${new Date().toISOString().split("T")[0]}.pdf`, "Distributors List", ["Name","Contact","Phone","Address","Company","Products"], filtered.map((d: Distributor) => [d.name, d.contact, d.phone, d.address, d.company_name||"", d.product_count||0]))}>
+          <Download className="h-4 w-4 mr-1" /> PDF
+        </Button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading ? (
@@ -86,6 +97,7 @@ export default function Distributors() {
                       <p className="text-xs text-text-secondary mt-0.5">{dist.contact}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{dist.phone}</div>
+                        {dist.company_name && <div className="flex items-center gap-1 text-xs text-text-secondary"><Building2 className="h-3 w-3" />{dist.company_name}</div>}
                         <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3" />{dist.product_count ?? 0} products</div>
                       </div>
                     </div>
@@ -112,7 +124,16 @@ export default function Distributors() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Name</Label>
+              <Label>Company</Label>
+              <SearchableSelect
+                options={companies.map((c: Company) => ({ value: c.id, label: c.name }))}
+                value={form.companyId}
+                onChange={(v) => setForm({ ...form, companyId: v })}
+                placeholder="Select company (optional)"
+              />
+            </div>
+            <div>
+              <Label>Distributor Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>

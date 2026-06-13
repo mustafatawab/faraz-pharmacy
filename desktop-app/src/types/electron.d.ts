@@ -21,6 +21,8 @@ export interface ElectronAPI {
     create(s: SaleInput): Promise<Sale>;
     listRecent(l?: number): Promise<Sale[]>;
     getById(id: string): Promise<Sale | null>;
+    listByDate(dateStr: string): Promise<Sale[]>;
+    listAll(opts?: { search?: string; dateFrom?: string; dateTo?: string }): Promise<Sale[]>;
   };
   customers: {
     list(): Promise<Customer[]>;
@@ -93,6 +95,7 @@ declare global {
     getServerIp: () => Promise<string>;
     appConfig: AppConfig;
     printReceipt: (sale: unknown) => Promise<{ success: boolean; error?: string }>;
+    printReturnReceipt: (returnData: unknown, sale: unknown) => Promise<{ success: boolean; error?: string }>;
     authLogin: (creds: { username: string; password: string }) => Promise<AuthResponse>;
     authLogout: (data: { accessToken: string }) => Promise<{ success: boolean }>;
     authRefresh: (data: { refreshToken: string | null }) => Promise<AuthResponse>;

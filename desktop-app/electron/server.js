@@ -26,12 +26,17 @@ function startServer(port) {
   app.get("/api/products/barcode/:b", (req, res) => res.json(db().prepare("SELECT * FROM products WHERE barcode = ?").get(req.params.b)));
   app.post("/api/products", (req, res) => {
     const p = req.body; const i = id();
-    db().prepare("INSERT INTO products (id,barcode,name,company,category,location,distributor_id,sale_price,purchase_price,stock_qty,expiry) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(i, p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, p.salePrice, p.purchasePrice, p.stockQty ?? 0, p.expiry||null);
+    const mp = p.markupPercent ?? 20;
+    const sp = p.salePrice > 0 ? p.salePrice : Math.round(p.purchasePrice * (1 + mp / 100));
+    db().prepare("INSERT INTO products (id,barcode,name,company,category,location,distributor_id,sale_price,purchase_price,markup_percent,stock_qty,expiry) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").run(i, p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, sp, p.purchasePrice, mp, p.stockQty ?? 0, p.expiry||null);
     res.json(db().prepare("SELECT * FROM products WHERE id = ?").get(i));
   });
   app.put("/api/products/:id", (req, res) => {
     const p = req.body;
-    db().prepare("UPDATE products SET barcode=?,name=?,company=?,category=?,location=?,distributor_id=?,sale_price=?,purchase_price=?,stock_qty=?,expiry=? WHERE id=?").run(p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, p.salePrice, p.purchasePrice, p.stockQty ?? 0, p.expiry||null, req.params.id);
+    const old = db().prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
+    const mp = p.markupPercent ?? old?.markup_percent ?? 20;
+    const sp = p.salePrice > 0 ? p.salePrice : Math.round(p.purchasePrice * (1 + mp / 100));
+    db().prepare("UPDATE products SET barcode=?,name=?,company=?,category=?,location=?,distributor_id=?,sale_price=?,purchase_price=?,markup_percent=?,stock_qty=?,expiry=? WHERE id=?").run(p.barcode, p.name, p.company||"", p.category||"", p.location||"", p.distributorId||null, sp, p.purchasePrice, mp, p.stockQty ?? 0, p.expiry||null, req.params.id);
     res.json(db().prepare("SELECT * FROM products WHERE id = ?").get(req.params.id));
   });
   app.delete("/api/products/:id", (req, res) => { db().prepare("UPDATE products SET active = 0 WHERE id = ?").run(req.params.id); res.json({ success: true }); });
@@ -58,8 +63,19 @@ function startServer(port) {
     const l = parseInt(req.query.limit) || 10;
     res.json(db().prepare("SELECT s.*, c.name as customer_name FROM sales s LEFT JOIN customers c ON s.customer_id=c.id ORDER BY s.created_at DESC LIMIT ?").all(l));
   });
+  app.get("/api/sales/date/:date", (req, res) => {
+    res.json(db().prepare("SELECT s.*, c.name as customer_name, (SELECT COUNT(*) FROM returns WHERE sale_id=s.id) as return_count FROM sales s LEFT JOIN customers c ON s.customer_id=c.id WHERE date(s.created_at)=? ORDER BY s.created_at DESC").all(req.params.date));
+  });
+  app.get("/api/sales", (req, res) => {
+    let q = "SELECT s.*, c.name as customer_name, (SELECT COUNT(*) FROM sale_items WHERE sale_id=s.id) as item_count, (SELECT COUNT(*) FROM returns WHERE sale_id=s.id) as return_count FROM sales s LEFT JOIN customers c ON s.customer_id=c.id WHERE 1=1";
+    const p = [];
+    if (req.query.dateFrom) { q += " AND date(s.created_at) >= ?"; p.push(req.query.dateFrom); }
+    if (req.query.dateTo) { q += " AND date(s.created_at) <= ?"; p.push(req.query.dateTo); }
+    if (req.query.search) { const s = `%${req.query.search}%`; q += " AND (s.id LIKE ? OR c.name LIKE ?)"; p.push(s, s); }
+    res.json(db().prepare(q + " ORDER BY s.created_at DESC LIMIT 500").all(...p));
+  });
   app.get("/api/sales/:id", (req, res) => {
-    const s = db().prepare("SELECT s.*, c.name as customer_name FROM sales s LEFT JOIN customers c ON s.customer_id=c.id WHERE s.id=?").get(req.params.id);
+    const s = db().prepare("SELECT s.*, c.name as customer_name, (SELECT COUNT(*) FROM returns WHERE sale_id=s.id) as return_count FROM sales s LEFT JOIN customers c ON s.customer_id=c.id WHERE s.id=?").get(req.params.id);
     if (s) s.items = db().prepare("SELECT * FROM sale_items WHERE sale_id=?").all(req.params.id);
     res.json(s);
   });
@@ -72,8 +88,8 @@ function startServer(port) {
     if (c) { c.purchases = db().prepare("SELECT s.*,(SELECT COUNT(*) FROM sale_items WHERE sale_id=s.id) as item_count FROM sales s WHERE s.customer_id=? ORDER BY s.created_at DESC").all(req.params.id); c.arrears = db().prepare("SELECT * FROM arrears WHERE customer_id=? ORDER BY created_at DESC").all(req.params.id); }
     res.json(c);
   });
-  app.post("/api/customers", (req, res) => { const c = req.body; const i=id(); db().prepare("INSERT INTO customers (id,name,phone) VALUES (?,?,?)").run(i,c.name,c.phone); res.json(db().prepare("SELECT * FROM customers WHERE id=?").get(i)); });
-  app.put("/api/customers/:id", (req, res) => { const c = req.body; db().prepare("UPDATE customers SET name=?, phone=? WHERE id=?").run(c.name, c.phone, req.params.id); res.json(db().prepare("SELECT * FROM customers WHERE id=?").get(req.params.id)); });
+  app.post("/api/customers", (req, res) => { const c = req.body; const i=id(); db().prepare("INSERT INTO customers (id,name,phone,address) VALUES (?,?,?,?)").run(i,c.name,c.phone,c.address||""); res.json(db().prepare("SELECT * FROM customers WHERE id=?").get(i)); });
+  app.put("/api/customers/:id", (req, res) => { const c = req.body; db().prepare("UPDATE customers SET name=?, phone=?, address=? WHERE id=?").run(c.name, c.phone, c.address||"", req.params.id); res.json(db().prepare("SELECT * FROM customers WHERE id=?").get(req.params.id)); });
   app.delete("/api/customers/:id", (req, res) => { db().prepare("DELETE FROM customers WHERE id=?").run(req.params.id); res.json({ success: true }); });
 
   // Arrears
@@ -105,17 +121,17 @@ function startServer(port) {
   app.delete("/api/arrears/:id", (req, res) => { db().prepare("DELETE FROM arrears WHERE id=?").run(req.params.id); res.json({ success: true }); });
 
   // Stock
-  app.get("/api/stock", (_, res) => res.json(db().prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id ORDER BY sp.created_at DESC").all()));
+  app.get("/api/stock", (_, res) => res.json(db().prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id ORDER BY sp.created_at DESC").all()));
   app.post("/api/stock", (req, res) => {
     const d = db(); const p = req.body; const i=id();
     const product = d.prepare("SELECT purchase_price FROM products WHERE id=?").get(p.productId);
     const price = p.purchasePrice ?? product?.purchase_price ?? 0;
     const tv = p.quantity * price;
     d.transaction(() => {
-      d.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,quantity,purchase_price,expiry,total_value) VALUES (?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.quantity, price, p.expiry||null, tv);
+      d.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,company_id,invoice_number,quantity,purchase_price,expiry,total_value) VALUES (?,?,?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.companyId||null, p.invoiceNumber||"", p.quantity, price, p.expiry||null, tv);
       d.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(p.quantity, price, p.expiry||null, p.productId);
     })();
-    res.json(d.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id WHERE sp.id=?").get(i));
+    res.json(d.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id WHERE sp.id=?").get(i));
   });
   app.put("/api/stock/:id", (req, res) => {
     const d = db(); const p = req.body;
@@ -125,28 +141,31 @@ function startServer(port) {
     const price = p.purchasePrice ?? old.purchase_price;
     const tv = p.quantity * price;
     d.transaction(() => {
-      d.prepare("UPDATE stock_purchases SET quantity=?, purchase_price=?, expiry=?, total_value=? WHERE id=?").run(p.quantity, price, p.expiry||null, tv, req.params.id);
+      d.prepare("UPDATE stock_purchases SET quantity=?, purchase_price=?, expiry=?, total_value=?, company_id=?, invoice_number=?, distributor_id=? WHERE id=?").run(p.quantity, price, p.expiry||null, tv, p.companyId||null, p.invoiceNumber||"", p.distributorId||null, req.params.id);
       d.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(qtyDiff, price, p.expiry||null, old.product_id);
     })();
-    res.json(d.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id WHERE sp.id=?").get(req.params.id));
+    res.json(d.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id WHERE sp.id=?").get(req.params.id));
   });
 
   // Distributors
-  app.get("/api/distributors", (_, res) => res.json(db().prepare("SELECT d.*, (SELECT COUNT(*) FROM products WHERE distributor_id=d.id) as product_count FROM distributors d ORDER BY d.name").all()));
-  app.post("/api/distributors", (req, res) => { const d = req.body; const i=id(); db().prepare("INSERT INTO distributors (id,name,contact,phone,address) VALUES (?,?,?,?,?)").run(i,d.name,d.contact,d.phone,d.address||""); res.json(db().prepare("SELECT * FROM distributors WHERE id=?").get(i)); });
-  app.put("/api/distributors/:id", (req, res) => { const d = req.body; db().prepare("UPDATE distributors SET name=?, contact=?, phone=?, address=? WHERE id=?").run(d.name, d.contact, d.phone, d.address, req.params.id); res.json(db().prepare("SELECT * FROM distributors WHERE id=?").get(req.params.id)); });
+  app.get("/api/distributors", (_, res) => res.json(db().prepare("SELECT d.*, c.name as company_name, (SELECT COUNT(*) FROM products WHERE distributor_id=d.id) as product_count FROM distributors d LEFT JOIN companies c ON d.company_id=c.id ORDER BY d.name").all()));
+  app.post("/api/distributors", (req, res) => { const d = req.body; const i=id(); db().prepare("INSERT INTO distributors (id,name,contact,phone,address,company_id) VALUES (?,?,?,?,?,?)").run(i,d.name,d.contact,d.phone,d.address||"",d.companyId||null); res.json(db().prepare("SELECT d.*, c.name as company_name FROM distributors d LEFT JOIN companies c ON d.company_id=c.id WHERE d.id=?").get(i)); });
+  app.put("/api/distributors/:id", (req, res) => { const d = req.body; db().prepare("UPDATE distributors SET name=?, contact=?, phone=?, address=?, company_id=? WHERE id=?").run(d.name, d.contact, d.phone, d.address, d.companyId||null, req.params.id); res.json(db().prepare("SELECT d.*, c.name as company_name FROM distributors d LEFT JOIN companies c ON d.company_id=c.id WHERE d.id=?").get(req.params.id)); });
   app.delete("/api/distributors/:id", (req, res) => { db().prepare("DELETE FROM distributors WHERE id=?").run(req.params.id); res.json({ success: true }); });
 
   // Companies
   app.get("/api/companies", (_, res) => res.json(db().prepare("SELECT c.*, (SELECT COUNT(*) FROM products WHERE company=c.name) as product_count FROM companies c ORDER BY c.name").all()));
-  app.post("/api/companies", (req, res) => { const c = req.body; const i=id(); db().prepare("INSERT INTO companies (id,name,contact,phone,address) VALUES (?,?,?,?,?)").run(i,c.name,c.contact,c.phone,c.address||""); res.json(db().prepare("SELECT * FROM companies WHERE id=?").get(i)); });
-  app.put("/api/companies/:id", (req, res) => { const c = req.body; db().prepare("UPDATE companies SET name=?, contact=?, phone=?, address=? WHERE id=?").run(c.name, c.contact, c.phone, c.address, req.params.id); res.json(db().prepare("SELECT * FROM companies WHERE id=?").get(req.params.id)); });
+  app.post("/api/companies", (req, res) => { const c = req.body; const i=id(); db().prepare("INSERT INTO companies (id,name,contact,phone,address,second_number) VALUES (?,?,?,?,?,?)").run(i,c.name,c.contact,c.phone,c.address||"",c.second_number||""); res.json(db().prepare("SELECT * FROM companies WHERE id=?").get(i)); });
+  app.put("/api/companies/:id", (req, res) => { const c = req.body; db().prepare("UPDATE companies SET name=?, contact=?, phone=?, address=?, second_number=? WHERE id=?").run(c.name, c.contact, c.phone, c.address, c.second_number||"", req.params.id); res.json(db().prepare("SELECT * FROM companies WHERE id=?").get(req.params.id)); });
   app.delete("/api/companies/:id", (req, res) => { db().prepare("DELETE FROM companies WHERE id=?").run(req.params.id); res.json({ success: true }); });
 
   // Returns
   app.get("/api/returns", (_, res) => res.json(db().prepare("SELECT * FROM returns ORDER BY created_at DESC").all()));
   app.post("/api/returns", (req, res) => {
-    const d = db(); const r = req.body; const ri = id();
+    const d = db(); const r = req.body;
+    const existing = d.prepare("SELECT COUNT(*) as c FROM returns WHERE sale_id=?").get(r.saleId);
+    if (existing.c > 0) return res.status(400).json({ error: "This sale has already been returned" });
+    const ri = id();
     d.transaction(() => {
       d.prepare("INSERT INTO returns (id,sale_id,refund_amount,reason) VALUES (?,?,?,?)").run(ri, r.saleId, r.refundAmount, r.reason);
       const ii = d.prepare("INSERT INTO return_items (id,return_id,product_id,product_name,quantity,refund_amount) VALUES (?,?,?,?,?,?)");

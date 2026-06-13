@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Users, CreditCard,
-  Factory, Building2, Undo2, Wallet, BarChart3, LogOut, PillBottle,
+  Factory, Building2, Undo2, Wallet, BarChart3, LogOut, PillBottle, Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/products", label: "Products", icon: Package },
   { href: "/stock", label: "Stock", icon: Boxes },
   { href: "/customers", label: "Customers", icon: Users },
+  { href: "/invoices", label: "Invoices", icon: Receipt },
   { href: "/arrears", label: "Arrears", icon: CreditCard },
   { href: "/distributors", label: "Distributors", icon: Factory },
   { href: "/companies", label: "Companies", icon: Building2 },

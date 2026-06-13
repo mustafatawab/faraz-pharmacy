@@ -153,12 +153,14 @@ export default function POS() {
             discountType={cart.discountType}
             subtotal={cart.subtotal}
             total={cart.total}
+            customerId={cart.customerId}
             onUpdateQuantity={cart.updateQuantity}
             onRemoveItem={cart.removeItem}
             onDiscountChange={cart.setDiscountValue}
             onToggleDiscountType={cart.toggleDiscountType}
             onClearCart={cart.clearCart}
             onCheckout={handleCheckout}
+            onCustomerChange={cart.setCustomerId}
             error={error}
           />
         </div>

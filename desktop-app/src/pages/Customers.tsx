@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, Phone, Pencil, Trash2 } from "lucide-react";
+import { Search, Plus, Phone, MapPin, Pencil, Trash2, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { downloadCSV, downloadPDF } from "@/lib/export";
 import type { Customer } from "@/types";
 
 export default function Customers() {
@@ -20,6 +21,7 @@ export default function Customers() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ["customers"],
@@ -27,23 +29,25 @@ export default function Customers() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => api.customers.create({ name, phone }),
+    mutationFn: () => api.customers.create({ name, phone, address }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       setOpen(false);
       setName("");
       setPhone("");
+      setAddress("");
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => api.customers.update(editingId!, { name, phone }),
+    mutationFn: () => api.customers.update(editingId!, { name, phone, address }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       setOpen(false);
       setEditingId(null);
       setName("");
       setPhone("");
+      setAddress("");
     },
   });
 
@@ -60,6 +64,7 @@ export default function Customers() {
     setEditingId(null);
     setName("");
     setPhone("");
+    setAddress("");
     setOpen(true);
   }
 
@@ -67,12 +72,14 @@ export default function Customers() {
     setEditingId(c.id);
     setName(c.name);
     setPhone(c.phone);
+    setAddress(c.address);
     setOpen(true);
   }
 
   const columns = [
     { key: "name", header: "Name", cell: (c: Customer) => <span className="font-medium text-text-primary">{c.name}</span> },
     { key: "phone", header: "Phone", cell: (c: Customer) => <span className="font-mono text-xs text-text-secondary">{c.phone}</span> },
+    { key: "address", header: "Address", cell: (c: Customer) => <span className="text-xs text-text-secondary truncate max-w-[180px] inline-block">{c.address || "\u2014"}</span> },
     { key: "total_purchases", header: "Purchases", cell: (c: Customer) => <span className="font-mono font-medium">{c.total_purchases ?? 0}</span> },
     { key: "outstanding_arrear", header: "Arrear", cell: (c: Customer) => {
       const arrear = c.outstanding_arrear ?? 0;
@@ -102,9 +109,17 @@ export default function Customers() {
   return (
     <div>
       <PageHeader title="Customers" description="Manage your customer relationships" action={{ label: "Add Customer", onClick: openAdd }} />
-      <div className="relative max-w-sm mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-        <Input placeholder="Search by name or phone..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+          <Input placeholder="Search by name or phone..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => downloadCSV(`customers_${new Date().toISOString().split("T")[0]}.csv`, ["Name","Phone","Address","Purchases","Arrear","Last Purchase"], filtered.map((c: Customer) => [c.name, c.phone, c.address, c.total_purchases||0, c.outstanding_arrear||0, c.last_purchase||""]))}>
+          <Download className="h-4 w-4 mr-1" /> CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadPDF(`customers_${new Date().toISOString().split("T")[0]}.pdf`, "Customers List", ["Name","Phone","Address","Purchases","Arrear","Last Purchase"], filtered.map((c: Customer) => [c.name, c.phone, c.address, c.total_purchases||0, c.outstanding_arrear||0, c.last_purchase||""]))}>
+          <Download className="h-4 w-4 mr-1" /> PDF
+        </Button>
       </div>
       <div className="rounded-xl border border-border">
         <DataTable
@@ -128,6 +143,10 @@ export default function Customers() {
             <div>
               <Label>Phone</Label>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
             <Button className="w-full" disabled={!name || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>

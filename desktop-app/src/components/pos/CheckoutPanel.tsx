@@ -1,13 +1,18 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ShoppingCart, Trash2 } from "lucide-react";
+import { ShoppingCart, Trash2, UserPlus, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CartItem from "@/components/pos/CartItem";
 import { formatCurrency } from "@/lib/utils";
-import type { SaleItemInput, DiscountType } from "@/types";
+import { api } from "@/lib/api";
+import type { SaleItemInput, DiscountType, Customer } from "@/types";
 
 interface CheckoutPanelProps {
   items: SaleItemInput[];
@@ -16,20 +21,44 @@ interface CheckoutPanelProps {
   discountType: DiscountType;
   subtotal: number;
   total: number;
+  customerId?: string;
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onRemoveItem: (productId: string) => void;
   onDiscountChange: (discount: number) => void;
   onToggleDiscountType: () => void;
   onClearCart: () => void;
   onCheckout: (amountPaid: number, discount: number) => Promise<void>;
+  onCustomerChange: (customerId?: string) => void;
   error?: string;
 }
 
 export default function CheckoutPanel({
-  items, discount, discountValue, discountType, subtotal, total,
+  items, discount, discountValue, discountType, subtotal, total, customerId,
   onUpdateQuantity, onRemoveItem, onDiscountChange, onToggleDiscountType,
-  onClearCart, onCheckout, error,
+  onClearCart, onCheckout, onCustomerChange, error,
 }: CheckoutPanelProps) {
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickName, setQuickName] = useState("");
+  const [quickPhone, setQuickPhone] = useState("");
+  const [quickAddress, setQuickAddress] = useState("");
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: api.customers.list,
+  });
+
+  const queryClient = useQueryClient();
+  const quickAddMutation = useMutation({
+    mutationFn: () => api.customers.create({ name: quickName, phone: quickPhone, address: quickAddress }),
+    onSuccess: (customer) => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      onCustomerChange(customer.id);
+      setQuickAddOpen(false);
+      setQuickName("");
+      setQuickPhone("");
+      setQuickAddress("");
+    },
+  });
   const [amountPaid, setAmountPaid] = useState("");
   const [processing, setProcessing] = useState(false);
 
@@ -82,7 +111,44 @@ export default function CheckoutPanel({
 
       {items.length > 0 && (
         <div className="pt-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <SearchableSelect
+                options={customers.map((c: Customer) => ({ value: c.id, label: `${c.name}${c.phone ? ` (${c.phone})` : ""}` }))}
+                value={customerId || ""}
+                onChange={(v) => onCustomerChange(v || undefined)}
+                placeholder="Customer (optional)"
+                className="h-8 text-xs"
+              />
+            </div>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setQuickAddOpen(true)} title="Quick add customer">
+              <UserPlus className="h-4 w-4" />
+            </Button>
+          </div>
           <Separator />
+
+          <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Quick Add Customer</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>Name</Label>
+                  <Input value={quickName} onChange={(e) => setQuickName(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input value={quickPhone} onChange={(e) => setQuickPhone(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Address</Label>
+                  <Input value={quickAddress} onChange={(e) => setQuickAddress(e.target.value)} />
+                </div>
+                <Button className="w-full" disabled={!quickName || quickAddMutation.isPending} onClick={() => quickAddMutation.mutate()}>
+                  {quickAddMutation.isPending ? "Adding..." : "Add Customer & Select"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <div>
             <div className="flex items-center gap-2">
               <button

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Phone, Package, Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Building2, Phone, Package, Search, Plus, Pencil, Trash2, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { downloadCSV, downloadPDF } from "@/lib/export";
 import type { Company } from "@/types";
 
 export default function Companies() {
@@ -16,7 +17,7 @@ export default function Companies() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", contact: "", phone: "", address: "" });
+  const [form, setForm] = useState({ name: "", contact: "", phone: "", address: "", second_number: "" });
 
   const { data: companies = [], isLoading } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
 
@@ -29,7 +30,7 @@ export default function Companies() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       setOpen(false);
-      setForm({ name: "", contact: "", phone: "", address: "" });
+      setForm({ name: "", contact: "", phone: "", address: "", second_number: "" });
     },
   });
 
@@ -39,7 +40,7 @@ export default function Companies() {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       setOpen(false);
       setEditingId(null);
-      setForm({ name: "", contact: "", phone: "", address: "" });
+      setForm({ name: "", contact: "", phone: "", address: "", second_number: "" });
     },
   });
 
@@ -50,22 +51,30 @@ export default function Companies() {
 
   function openAdd() {
     setEditingId(null);
-    setForm({ name: "", contact: "", phone: "", address: "" });
+    setForm({ name: "", contact: "", phone: "", address: "", second_number: "" });
     setOpen(true);
   }
 
   function openEdit(c: Company) {
     setEditingId(c.id);
-    setForm({ name: c.name, contact: c.contact, phone: c.phone, address: c.address });
+    setForm({ name: c.name, contact: c.contact, phone: c.phone, address: c.address, second_number: c.second_number });
     setOpen(true);
   }
 
   return (
     <div>
       <PageHeader title="Companies" description="Manage pharmaceutical companies" action={{ label: "Add Company", onClick: openAdd }} />
-      <div className="relative max-w-sm mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-        <Input placeholder="Search companies..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex items-center gap-2 mb-6">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+          <Input placeholder="Search companies..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => downloadCSV(`companies_${new Date().toISOString().split("T")[0]}.csv`, ["Name","Contact","Phone","Address","Second Number","Products"], filtered.map((c: Company) => [c.name, c.contact, c.phone, c.address, c.second_number||"", c.product_count||0]))}>
+          <Download className="h-4 w-4 mr-1" /> CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadPDF(`companies_${new Date().toISOString().split("T")[0]}.pdf`, "Companies List", ["Name","Contact","Phone","Address","Second Number","Products"], filtered.map((c: Company) => [c.name, c.contact, c.phone, c.address, c.second_number||"", c.product_count||0]))}>
+          <Download className="h-4 w-4 mr-1" /> PDF
+        </Button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading ? (
@@ -86,6 +95,7 @@ export default function Companies() {
                       <p className="text-xs text-text-secondary mt-0.5">{comp.contact}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{comp.phone}</div>
+                        {comp.second_number && <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{comp.second_number}</div>}
                         <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3" />{comp.product_count ?? 0} products</div>
                       </div>
                     </div>
@@ -119,14 +129,18 @@ export default function Companies() {
               <Label>Contact Person</Label>
               <Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
             </div>
+            <div>
+              <Label>Address</Label>
+              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Phone</Label>
                 <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
               <div>
-                <Label>Address</Label>
-                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                <Label>Second Number</Label>
+                <Input value={form.second_number} onChange={(e) => setForm({ ...form, second_number: e.target.value })} />
               </div>
             </div>
             <Button className="w-full" disabled={!form.name || createMutation.isPending || updateMutation.isPending}

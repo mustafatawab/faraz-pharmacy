@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Archive, RotateCcw, Pencil } from "lucide-react";
+import { Plus, Search, Archive, RotateCcw, Pencil, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -11,17 +11,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, generateBarcode } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { downloadCSV, downloadPDF } from "@/lib/export";
 import type { Product } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/types";
 
 interface ProductForm {
   barcode: string; name: string; category: string; location: string;
-  salePrice: string; purchasePrice: string; expiry: string;
+  purchasePrice: string; expiry: string;
 }
 
 const emptyForm = (): ProductForm => ({
   barcode: generateBarcode(), name: "", category: "", location: "",
-  salePrice: "", purchasePrice: "", expiry: "",
+  purchasePrice: "", expiry: "",
 });
 
 export default function Products() {
@@ -47,8 +48,7 @@ export default function Products() {
   const createMutation = useMutation({
     mutationFn: () => api.products.create({
       barcode: form.barcode, name: form.name, category: form.category,
-      location: form.location, salePrice: Number(form.salePrice),
-      purchasePrice: Number(form.purchasePrice),
+      location: form.location, purchasePrice: Number(form.purchasePrice),
       expiry: form.expiry || undefined,
     }),
     onSuccess: (product) => {
@@ -61,8 +61,7 @@ export default function Products() {
   const updateMutation = useMutation({
     mutationFn: () => api.products.update(editingId!, {
       barcode: form.barcode, name: form.name, category: form.category,
-      location: form.location, salePrice: Number(form.salePrice),
-      purchasePrice: Number(form.purchasePrice),
+      location: form.location, purchasePrice: Number(form.purchasePrice),
       expiry: form.expiry || undefined,
     }),
     onSuccess: () => {
@@ -92,8 +91,7 @@ export default function Products() {
     setEditingId(product.id);
     setForm({
       barcode: product.barcode, name: product.name, category: product.category,
-      location: product.location, salePrice: String(product.sale_price),
-      purchasePrice: String(product.purchase_price),
+      location: product.location, purchasePrice: String(product.purchase_price),
       expiry: product.expiry || "",
     });
     setOpen(true);
@@ -167,6 +165,12 @@ export default function Products() {
           <Archive className="h-4 w-4 mr-1.5" />
           Archived
         </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadCSV(`products_${new Date().toISOString().split("T")[0]}.csv`, ["Barcode","Name","Company","Category","Location","Sale Price","Purchase Price","Stock","Expiry","Status"], filtered.map((p: Product) => [p.barcode, p.name, p.company, p.category, p.location, p.sale_price, p.purchase_price, p.stock_qty, p.expiry||"", p.active?"Active":"Archived"]))}>
+          <Download className="h-4 w-4 mr-1" /> CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadPDF(`products_${new Date().toISOString().split("T")[0]}.pdf`, "Products List", ["Barcode","Name","Company","Category","Location","Sale Price","Purchase Price","Stock","Expiry","Status"], filtered.map((p: Product) => [p.barcode, p.name, p.company, p.category, p.location, p.sale_price, p.purchase_price, p.stock_qty, p.expiry||"", p.active?"Active":"Archived"]))}>
+          <Download className="h-4 w-4 mr-1" /> PDF
+        </Button>
       </div>
 
       <div className="rounded-xl border border-border">
@@ -204,21 +208,23 @@ export default function Products() {
                 <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Shelf A1" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Sale Price</Label>
-                <Input type="number" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} />
-              </div>
-              <div>
-                <Label>Purchase Price</Label>
-                <Input type="number" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
-              </div>
+            <div>
+              <Label>Purchase Price</Label>
+              <Input type="number" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
             </div>
+            {form.purchasePrice && (
+              <div className="text-sm text-text-secondary flex items-center gap-2">
+                <span>Sale Price (auto-calculated):</span>
+                <span className="font-mono font-medium text-accent">
+                  {formatCurrency(Math.round(Number(form.purchasePrice) * 1.2))}
+                </span>
+              </div>
+            )}
             <div>
               <Label>Expiry (optional)</Label>
               <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} />
             </div>
-            <Button className="w-full mt-2" disabled={!form.name || !form.salePrice || createMutation.isPending || updateMutation.isPending}
+            <Button className="w-full mt-2" disabled={!form.name || !form.purchasePrice || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Product" : "Add Product"}
             </Button>
