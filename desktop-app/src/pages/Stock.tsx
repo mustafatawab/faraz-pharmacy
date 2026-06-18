@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Plus, Package, Pencil, Building2, Factory, FileText } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
@@ -48,6 +49,10 @@ export default function Stock() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setOpen(false);
       setForm({ productId: "", distributorId: "", companyId: "", invoiceNumber: "", purchasePrice: "", quantity: "", expiry: "" });
+      toast.success("Stock purchase recorded");
+    },
+    onError: (err) => {
+      toast.error(err.message);
     },
   });
 
@@ -67,6 +72,10 @@ export default function Stock() {
       setOpen(false);
       setEditingId(null);
       setForm({ productId: "", distributorId: "", companyId: "", invoiceNumber: "", purchasePrice: "", quantity: "", expiry: "" });
+      toast.success("Stock purchase updated");
+    },
+    onError: (err) => {
+      toast.error(err.message);
     },
   });
 

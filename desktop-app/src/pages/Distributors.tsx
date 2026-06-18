@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Factory, Building2, Phone, Package, Search, Plus, Pencil, Trash2, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
@@ -30,25 +31,33 @@ export default function Distributors() {
   const createMutation = useMutation({
     mutationFn: () => api.distributors.create(form),
     onSuccess: () => {
+      toast.success("Distributor created");
       queryClient.invalidateQueries({ queryKey: ["distributors"] });
       setOpen(false);
       setForm({ name: "", contact: "", phone: "", address: "", companyId: "" });
     },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: () => api.distributors.update(editingId!, form),
     onSuccess: () => {
+      toast.success("Distributor updated");
       queryClient.invalidateQueries({ queryKey: ["distributors"] });
       setOpen(false);
       setEditingId(null);
       setForm({ name: "", contact: "", phone: "", address: "", companyId: "" });
     },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.distributors.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["distributors"] }),
+    onSuccess: () => {
+      toast.success("Distributor deleted");
+      queryClient.invalidateQueries({ queryKey: ["distributors"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   function openAdd() {

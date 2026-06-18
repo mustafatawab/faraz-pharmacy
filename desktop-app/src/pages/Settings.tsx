@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Database, HardDrive, Trash2, RefreshCw, CheckCircle2, XCircle,
@@ -70,14 +71,17 @@ export default function Settings() {
     mutationFn: api.settings.backupCreate,
     onSuccess: (result) => {
       if (result.success) {
+        toast.success(`Backup created: ${result.name}`);
         setBackupStatus({ type: "success", message: `Backup created: ${result.name}` });
         queryClient.invalidateQueries({ queryKey: ["settings", "backups"] });
       } else {
+        toast.error(result.error || "Backup failed");
         setBackupStatus({ type: "error", message: result.error || "Backup failed" });
       }
       setTimeout(() => setBackupStatus(null), 5000);
     },
     onError: (err: Error) => {
+      toast.error(err.message);
       setBackupStatus({ type: "error", message: err.message });
       setTimeout(() => setBackupStatus(null), 5000);
     },
@@ -86,11 +90,13 @@ export default function Settings() {
   const restoreMutation = useMutation({
     mutationFn: (name: string) => api.settings.backupRestore(name),
     onSuccess: () => {
+      toast.success("Database restored from backup successfully.");
       setBackupStatus({ type: "success", message: "Database restored from backup successfully." });
       queryClient.invalidateQueries({ queryKey: ["settings", "backups"] });
       setTimeout(() => setBackupStatus(null), 5000);
     },
     onError: (err: Error) => {
+      toast.error(err.message);
       setBackupStatus({ type: "error", message: err.message });
       setTimeout(() => setBackupStatus(null), 5000);
     },
@@ -98,12 +104,24 @@ export default function Settings() {
 
   const deleteBackupMutation = useMutation({
     mutationFn: (name: string) => api.settings.backupDelete(name),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settings", "backups"] }),
+    onSuccess: () => {
+      toast.success("Backup deleted");
+      queryClient.invalidateQueries({ queryKey: ["settings", "backups"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
   });
 
   const saveGdriveMutation = useMutation({
     mutationFn: (cfg: GDriveConfig) => api.settings.gdriveSaveConfig(cfg),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settings", "gdrive"] }),
+    onSuccess: () => {
+      toast.success("Settings saved");
+      queryClient.invalidateQueries({ queryKey: ["settings", "gdrive"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
   });
 
   async function handlePickDirectory() {

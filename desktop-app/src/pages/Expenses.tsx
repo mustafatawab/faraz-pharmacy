@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Wallet, Search, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
@@ -38,26 +39,34 @@ export default function Expenses() {
   const createMutation = useMutation({
     mutationFn: () => api.expenses.create({ title: form.title, category: form.category, amount: Number(form.amount), notes: form.notes, date: form.date }),
     onSuccess: () => {
+      toast.success("Expense created");
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       setOpen(false);
       setEditingId(null);
       setForm({ title: "", category: "Utilities", amount: "", notes: "", date: new Date().toISOString().split("T")[0] });
     },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: () => api.expenses.update(editingId!, { title: form.title, category: form.category, amount: Number(form.amount), notes: form.notes, date: form.date }),
     onSuccess: () => {
+      toast.success("Expense updated");
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       setOpen(false);
       setEditingId(null);
       setForm({ title: "", category: "Utilities", amount: "", notes: "", date: new Date().toISOString().split("T")[0] });
     },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.expenses.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+    onSuccess: () => {
+      toast.success("Expense deleted");
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   function openAdd() {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CreditCard, Plus, Trash2, CheckCircle, Lock } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
@@ -45,10 +46,14 @@ export default function Arrears() {
   const recordPayment = useMutation({
     mutationFn: ({ id, amount }: { id: string; amount: number }) => api.arrears.recordPayment(id, amount),
     onSuccess: () => {
+      toast.success("Payment recorded");
       queryClient.invalidateQueries({ queryKey: ["arrears"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       setPayingId(null);
       setPaymentAmount("");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
     },
   });
 
@@ -59,28 +64,40 @@ export default function Arrears() {
       amountPaid: form.amountPaid ? Number(form.amountPaid) : 0,
     }),
     onSuccess: () => {
+      toast.success("Arrear added");
       queryClient.invalidateQueries({ queryKey: ["arrears"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       setOpen(false);
       setForm({ customerId: "", totalBill: "", amountPaid: "" });
     },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.arrears.delete(id),
     onSuccess: () => {
+      toast.success("Arrear deleted");
       queryClient.invalidateQueries({ queryKey: ["arrears"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
     },
   });
 
   const settleMutation = useMutation({
     mutationFn: (id: string) => api.arrears.settle(id),
     onSuccess: () => {
+      toast.success("Arrear settled");
       queryClient.invalidateQueries({ queryKey: ["arrears"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
     },
   });
 

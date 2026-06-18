@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Plus, Search, Archive, RotateCcw, Pencil, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
@@ -55,6 +56,10 @@ export default function Products() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setAddedId(product.id);
       setOpen(false);
+      toast.success("Product created");
+    },
+    onError: (err) => {
+      toast.error(err.message);
     },
   });
 
@@ -68,17 +73,33 @@ export default function Products() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setOpen(false);
       setEditingId(null);
+      toast.success("Product updated");
+    },
+    onError: (err) => {
+      toast.error(err.message);
     },
   });
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) => api.products.archive(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Product archived");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
   });
 
   const restoreMutation = useMutation({
     mutationFn: (id: string) => api.products.restore(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Product restored");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
   });
 
   function openAdd() {

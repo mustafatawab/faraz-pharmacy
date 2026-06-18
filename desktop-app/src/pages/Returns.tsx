@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Plus, Minus, Trash2, Printer, AlertCircle, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
@@ -71,6 +72,7 @@ export default function Returns() {
       });
     },
     onSuccess: async (returnData) => {
+      toast.success("Return processed");
       queryClient.invalidateQueries({ queryKey: ["returns"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["sales-by-date"] });
@@ -98,7 +100,8 @@ export default function Returns() {
       setReturnQtys({});
       setError("");
     },
-    onError: (err) => {
+    onError: (err: Error) => {
+      toast.error(err.message);
       setError(err instanceof Error ? err.message : "Failed to process return");
     },
   });

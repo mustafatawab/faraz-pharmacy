@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Search, Plus, Phone, MapPin, Pencil, Trash2, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
@@ -36,6 +37,10 @@ export default function Customers() {
       setName("");
       setPhone("");
       setAddress("");
+      toast.success("Customer created");
+    },
+    onError: (err) => {
+      toast.error(err.message);
     },
   });
 
@@ -48,12 +53,22 @@ export default function Customers() {
       setName("");
       setPhone("");
       setAddress("");
+      toast.success("Customer updated");
+    },
+    onError: (err) => {
+      toast.error(err.message);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.customers.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("Customer deleted");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
   });
 
   const filtered = customers.filter((c: Customer) =>

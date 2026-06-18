@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ShoppingCart, Trash2, UserPlus, User } from "lucide-react";
@@ -52,12 +53,16 @@ export default function CheckoutPanel({
   const quickAddMutation = useMutation({
     mutationFn: () => api.customers.create({ name: quickName, phone: quickPhone, address: quickAddress }),
     onSuccess: (customer) => {
+      toast.success("Customer added");
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       onCustomerChange(customer.id, customer.name);
       setQuickAddOpen(false);
       setQuickName("");
       setQuickPhone("");
       setQuickAddress("");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
     },
   });
   const [amountPaid, setAmountPaid] = useState("");
@@ -74,10 +79,12 @@ export default function CheckoutPanel({
     setProcessing(true);
     try {
       await onCheckout(numPaid, discount);
+      toast.success("Sale completed");
       onClearCart();
       setAmountPaid("");
       setAddToArrears(false);
     } catch {
+      toast.error("Checkout failed");
       console.error("Checkout failed");
     } finally {
       setProcessing(false);

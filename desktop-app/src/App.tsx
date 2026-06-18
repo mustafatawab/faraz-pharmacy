@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
@@ -97,6 +98,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppShell />
+      <Toaster richColors position="top-right" />
     </AuthProvider>
   );
 }
