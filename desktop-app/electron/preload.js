@@ -66,13 +66,26 @@ contextBridge.exposeInMainWorld("electronAPI", {
   dashboard: {
     stats: () => ipcRenderer.invoke("dashboard:stats"),
   },
+  printers: {
+    list: () => ipcRenderer.invoke("printers:list"),
+    getConfig: () => ipcRenderer.invoke("config:get-printer"),
+    saveConfig: (cfg) => ipcRenderer.invoke("config:save-printer", cfg),
+  },
+  settings: {
+    backupCreate: () => ipcRenderer.invoke("settings:backup-create"),
+    backupList: () => ipcRenderer.invoke("settings:backup-list"),
+    backupDelete: (name) => ipcRenderer.invoke("settings:backup-delete", { name }),
+    gdriveGetConfig: () => ipcRenderer.invoke("settings:gdrive-get-config"),
+    gdriveSaveConfig: (cfg) => ipcRenderer.invoke("settings:gdrive-save-config", cfg),
+  },
 });
 
 contextBridge.exposeInMainWorld("saveConfig", (cfg) => ipcRenderer.invoke("config:save", cfg));
 contextBridge.exposeInMainWorld("getServerIp", () => ipcRenderer.invoke("server:ip"));
-contextBridge.exposeInMainWorld("printReceipt", (sale) => ipcRenderer.invoke("print:receipt", sale));
-contextBridge.exposeInMainWorld("printReturnReceipt", (returnData, sale) => ipcRenderer.invoke("print:return-receipt", returnData, sale));
+contextBridge.exposeInMainWorld("printReceipt", (sale, printerConfig) => ipcRenderer.invoke("print:receipt", sale, printerConfig));
+contextBridge.exposeInMainWorld("printReturnReceipt", (returnData, sale, printerConfig) => ipcRenderer.invoke("print:return-receipt", returnData, sale, printerConfig));
 contextBridge.exposeInMainWorld("authLogin", (creds) => ipcRenderer.invoke("auth:login", creds));
 contextBridge.exposeInMainWorld("authLogout", (data) => ipcRenderer.invoke("auth:logout", data));
 contextBridge.exposeInMainWorld("authRefresh", (data) => ipcRenderer.invoke("auth:refresh", data));
 contextBridge.exposeInMainWorld("authMe", (data) => ipcRenderer.invoke("auth:me", data));
+contextBridge.exposeInMainWorld("verifyAdminPassword", (password) => ipcRenderer.invoke("auth:verify-password", { password }));

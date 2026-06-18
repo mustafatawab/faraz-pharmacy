@@ -4,6 +4,7 @@ import type {
   Company, CompanyInput, ReturnEntry, ReturnInput, Expense, ExpenseInput,
   DashboardStats,
 } from "@/types";
+import type { BackupResult, BackupEntry, GDriveConfig } from "@/types/electron";
 
 const cfg = () => window.appConfig;
 const base = () => `${cfg().serverUrl}`;
@@ -124,9 +125,25 @@ const api = {
     delete: (id: string): Promise<{ success: boolean }> =>
       isClient() ? fetchJson("DELETE", `/api/expenses/${id}`) : window.electronAPI.expenses.delete(id),
   },
+  auth: {
+    verifyPassword: (password: string): Promise<{ valid: boolean }> =>
+      isClient() ? fetchJson("POST", "/api/auth/verify-password", { password }) : window.verifyAdminPassword(password),
+  },
   dashboard: {
     stats: (): Promise<DashboardStats> =>
       isClient() ? fetchJson("GET", "/api/dashboard/stats") : window.electronAPI.dashboard.stats(),
+  },
+  settings: {
+    backupCreate: (): Promise<BackupResult> =>
+      isClient() ? fetchJson("POST", "/api/settings/backup") : window.electronAPI.settings.backupCreate(),
+    backupList: (): Promise<BackupEntry[]> =>
+      isClient() ? fetchJson("GET", "/api/settings/backups") : window.electronAPI.settings.backupList(),
+    backupDelete: (name: string): Promise<{ success: boolean; error?: string }> =>
+      isClient() ? fetchJson("DELETE", "/api/settings/backup", { name }) : window.electronAPI.settings.backupDelete(name),
+    gdriveGetConfig: (): Promise<GDriveConfig> =>
+      isClient() ? fetchJson("GET", "/api/settings/gdrive") : window.electronAPI.settings.gdriveGetConfig(),
+    gdriveSaveConfig: (cfg: GDriveConfig): Promise<{ success: boolean }> =>
+      isClient() ? fetchJson("PUT", "/api/settings/gdrive", cfg) : window.electronAPI.settings.gdriveSaveConfig(cfg),
   },
 };
 

@@ -7,7 +7,7 @@ const { startServer } = require("./server");
 const { loadConfig, saveConfig } = require("./config");
 const { printReceipt, printReturnReceipt } = require("./printer");
 
-const isDev = process.env.NODE_ENV === "development";
+const isDev = process.env.NODE_ENV === "development" || process.argv.includes("--dev");
 
 function getLocalIp() {
   const ifaces = os.networkInterfaces();
@@ -67,18 +67,39 @@ app.whenReady().then(() => {
 
   ipcMain.handle("server:ip", () => getLocalIp());
 
-  ipcMain.handle("print:receipt", async (_, sale) => {
+  ipcMain.handle("printers:list", async () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return [];
     try {
-      await printReceipt(sale);
+      return await win.webContents.getPrintersAsync();
+    } catch {
+      return [];
+    }
+  });
+
+  ipcMain.handle("config:get-printer", () => {
+    return loadConfig().printer || { paperSize: "thermal", deviceName: null };
+  });
+
+  ipcMain.handle("config:save-printer", (_, printerConfig) => {
+    const cfg = loadConfig();
+    cfg.printer = printerConfig;
+    saveConfig(cfg);
+    return { success: true };
+  });
+
+  ipcMain.handle("print:receipt", async (_, sale, printerConfig) => {
+    try {
+      await printReceipt(sale, printerConfig);
       return { success: true };
     } catch (e) {
       return { success: false, error: e.message };
     }
   });
 
-  ipcMain.handle("print:return-receipt", async (_, returnData, sale) => {
+  ipcMain.handle("print:return-receipt", async (_, returnData, sale, printerConfig) => {
     try {
-      await printReturnReceipt(returnData, sale);
+      await printReturnReceipt(returnData, sale, printerConfig);
       return { success: true };
     } catch (e) {
       return { success: false, error: e.message };

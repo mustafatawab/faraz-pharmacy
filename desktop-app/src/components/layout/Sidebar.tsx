@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Users, CreditCard,
-  Factory, Building2, Undo2, Wallet, BarChart3, LogOut, Receipt,
+  Factory, Building2, Undo2, Wallet, BarChart3, LogOut, Receipt, Settings,
 } from "lucide-react";
 import logo from "@/asset/image/logo.png";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,28 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="border-t border-border px-3 py-2">
+        <button
+          onClick={() => navigate("/settings")}
+          className={cn(
+            "relative flex items-center w-full rounded-lg transition-all duration-150 gap-3 px-3 h-11",
+            pathname === "/settings"
+              ? "bg-accent/10 text-accent font-semibold"
+              : "text-text-secondary hover:text-text-primary hover:bg-surface-2"
+          )}
+        >
+          {pathname === "/settings" && (
+            <motion.div
+              layoutId="sidebar-active"
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full bg-accent"
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            />
+          )}
+          <Settings className="h-5 w-5 shrink-0" />
+          <span className="text-sm truncate">Settings</span>
+        </button>
+      </div>
 
       <div className="border-t border-border p-3 space-y-3">
         <div className="flex items-center gap-3">

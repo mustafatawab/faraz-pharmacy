@@ -2,7 +2,7 @@ import type {
   Product, ProductInput, Sale, SaleInput, Customer, CustomerInput,
   Arrear, ArrearInput, StockPurchase, StockInput, Distributor, DistributorInput,
   Company, CompanyInput, ReturnEntry, ReturnInput, Expense, ExpenseInput,
-  DashboardStats,
+  DashboardStats, PrinterConfig,
 } from "./index";
 
 export interface ElectronAPI {
@@ -69,12 +69,50 @@ export interface ElectronAPI {
   dashboard: {
     stats(): Promise<DashboardStats>;
   };
+  printers: {
+    list(): Promise<{ name: string; displayName: string; isDefault: boolean }[]>;
+    getConfig(): Promise<PrinterConfig>;
+    saveConfig(cfg: PrinterConfig): Promise<{ success: boolean }>;
+  };
+  settings: {
+    backupCreate(): Promise<BackupResult>;
+    backupList(): Promise<BackupEntry[]>;
+    backupDelete(name: string): Promise<{ success: boolean; error?: string }>;
+    gdriveGetConfig(): Promise<GDriveConfig>;
+    gdriveSaveConfig(cfg: GDriveConfig): Promise<{ success: boolean }>;
+  };
 }
 
 export interface AppConfig {
   mode: "server" | "client" | null;
   serverUrl: string;
   serverPort: number;
+  printer?: PrinterConfig;
+}
+
+export interface BackupEntry {
+  name: string;
+  path: string;
+  size: number;
+  createdAt: string;
+}
+
+export interface BackupResult {
+  success: boolean;
+  name?: string;
+  path?: string;
+  size?: number;
+  createdAt?: string;
+  error?: string;
+}
+
+export interface GDriveConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  refreshToken: string;
+  autoUpload: boolean;
+  connected: boolean;
 }
 
 interface AuthResponse {
@@ -94,11 +132,12 @@ declare global {
     saveConfig: (config: { mode: string; serverUrl?: string }) => Promise<{ success: boolean }>;
     getServerIp: () => Promise<string>;
     appConfig: AppConfig;
-    printReceipt: (sale: unknown) => Promise<{ success: boolean; error?: string }>;
-    printReturnReceipt: (returnData: unknown, sale: unknown) => Promise<{ success: boolean; error?: string }>;
+    printReceipt: (sale: unknown, printerConfig?: PrinterConfig) => Promise<{ success: boolean; error?: string }>;
+    printReturnReceipt: (returnData: unknown, sale: unknown, printerConfig?: PrinterConfig) => Promise<{ success: boolean; error?: string }>;
     authLogin: (creds: { username: string; password: string }) => Promise<AuthResponse>;
     authLogout: (data: { accessToken: string }) => Promise<{ success: boolean }>;
     authRefresh: (data: { refreshToken: string | null }) => Promise<AuthResponse>;
     authMe: (data: { accessToken: string }) => Promise<AuthResponse>;
+    verifyAdminPassword: (password: string) => Promise<{ valid: boolean }>;
   }
 }

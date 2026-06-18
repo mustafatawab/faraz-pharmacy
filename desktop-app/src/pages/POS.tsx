@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { Printer, FileText } from "lucide-react";
 import BarcodeInput from "@/components/pos/BarcodeInput";
 import ProductCard from "@/components/pos/ProductCard";
 import CheckoutPanel from "@/components/pos/CheckoutPanel";
@@ -17,7 +18,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Product } from "@/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import type { Product, PrinterConfig } from "@/types";
+
+const PAPER_SIZES = [
+  { value: "thermal", label: "Thermal (80mm)", icon: Printer },
+  { value: "a5", label: "A5", icon: FileText },
+  { value: "a4", label: "A4", icon: FileText },
+] as const;
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -26,6 +41,20 @@ export default function POS() {
   const debouncedSearch = useDebounce(search, 200);
   const cart = useCart();
   const queryClient = useQueryClient();
+
+  const [printerConfig, setPrinterConfig] = useState<PrinterConfig>({ paperSize: "thermal", deviceName: null });
+  const [printers, setPrinters] = useState<{ name: string; displayName: string; isDefault: boolean }[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState<string>("default");
+
+  useEffect(() => {
+    if (window.electronAPI?.printers) {
+      window.electronAPI.printers.getConfig().then((cfg) => {
+        setPrinterConfig(cfg);
+        if (cfg.deviceName) setSelectedPrinter(cfg.deviceName);
+      });
+      window.electronAPI.printers.list().then(setPrinters);
+    }
+  }, []);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", debouncedSearch],
@@ -83,8 +112,16 @@ export default function POS() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["sales"] });
 
+      let customerTotalArrears = 0;
+      if (cart.customerId) {
+        const customer = await api.customers.getById(cart.customerId);
+        customerTotalArrears = customer?.outstanding_arrear ?? 0;
+      }
+
       const printData = {
         ...sale,
+        customer_name: cart.customerName,
+        customer_total_arrears: customerTotalArrears,
         items: cart.items.map((item) => ({
           product_name: item.productName,
           quantity: item.quantity,
@@ -101,10 +138,14 @@ export default function POS() {
 
   async function handlePrintYes() {
     setShowPrintDialog(false);
+    const config: PrinterConfig = {
+      paperSize: printerConfig.paperSize,
+      deviceName: selectedPrinter === "default" ? null : selectedPrinter,
+    };
     if (window.printReceipt && pendingPrintData) {
-      const result = await window.printReceipt(pendingPrintData);
+      const result = await window.printReceipt(pendingPrintData, config);
       if (!result.success) {
-        console.warn("Receipt print failed:", result.error);
+        setError(result.error || "Print failed");
       }
     }
     setPendingPrintData(null);
@@ -113,6 +154,14 @@ export default function POS() {
   function handlePrintNo() {
     setShowPrintDialog(false);
     setPendingPrintData(null);
+  }
+
+  function handleSavePrinterPref() {
+    const config: PrinterConfig = {
+      paperSize: printerConfig.paperSize,
+      deviceName: selectedPrinter === "default" ? null : selectedPrinter,
+    };
+    window.electronAPI?.printers?.saveConfig(config);
   }
 
   return (
@@ -160,7 +209,7 @@ export default function POS() {
             onToggleDiscountType={cart.toggleDiscountType}
             onClearCart={cart.clearCart}
             onCheckout={handleCheckout}
-            onCustomerChange={cart.setCustomerId}
+            onCustomerChange={cart.setCustomer}
             error={error}
           />
         </div>
@@ -168,12 +217,55 @@ export default function POS() {
       <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Print Receipt?</AlertDialogTitle>
-            <AlertDialogDescription>Send receipt to the thermal printer?</AlertDialogDescription>
+            <AlertDialogTitle>Print Receipt</AlertDialogTitle>
+            <AlertDialogDescription>Select paper size and printer</AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Paper Size</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {PAPER_SIZES.map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => setPrinterConfig({ ...printerConfig, paperSize: value as "thermal" | "a4" | "a5" })}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-colors ${
+                      printerConfig.paperSize === value
+                        ? "border-accent bg-accent/5"
+                        : "border-border hover:border-accent/50"
+                    }`}
+                  >
+                    <Icon className={`h-5 w-5 ${printerConfig.paperSize === value ? "text-accent" : "text-text-secondary"}`} />
+                    <span className={`text-xs font-medium ${printerConfig.paperSize === value ? "text-accent" : "text-text-secondary"}`}>
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Printer</Label>
+              <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Default printer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default Printer</SelectItem>
+                  {printers.map((p) => (
+                    <SelectItem key={p.name} value={p.name}>
+                      {p.displayName} {p.isDefault ? "(Default)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handlePrintNo}>No</AlertDialogCancel>
-            <AlertDialogAction onClick={handlePrintYes}>Yes</AlertDialogAction>
+            <AlertDialogCancel onClick={handlePrintNo}>Don't Print</AlertDialogCancel>
+            <div className="flex gap-2">
+              <AlertDialogAction onClick={() => { handleSavePrinterPref(); handlePrintYes(); }}>
+                Print
+              </AlertDialogAction>
+            </div>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

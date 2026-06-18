@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Plus, Minus, Trash2, Printer, AlertCircle, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
@@ -21,12 +21,19 @@ function today() {
 export default function Returns() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [printerConfig, setPrinterConfig] = useState<{ paperSize: string; deviceName: string | null }>({ paperSize: "thermal", deviceName: null });
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(today());
   const [selectedSaleId, setSelectedSaleId] = useState("");
   const [reason, setReason] = useState("");
   const [returnQtys, setReturnQtys] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (window.electronAPI?.printers) {
+      window.electronAPI.printers.getConfig().then(setPrinterConfig);
+    }
+  }, []);
 
   const { data: returns = [], isLoading } = useQuery({ queryKey: ["returns"], queryFn: api.returns.list });
 
@@ -79,9 +86,9 @@ export default function Returns() {
             }),
           reason,
         };
-        const printResult = await window.printReturnReceipt(printPayload, selectedSale);
+        const printResult = await window.printReturnReceipt(printPayload, selectedSale, printerConfig);
         if (!printResult.success) {
-          console.warn("Return receipt print failed:", printResult.error);
+          setError(printResult.error || "Print failed");
         }
       }
 
