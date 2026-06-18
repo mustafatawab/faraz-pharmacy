@@ -1,8 +1,12 @@
 const express = require("express");
 const cors = require("cors");
-const { getDatabase } = require("./database");
+const { getDatabase, getDataDir, getDbPath } = require("./database");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const id = () => crypto.randomUUID();
+const BACKUPS_DIR = path.join(getDataDir(), "backups");
+if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
 let serverInstance;
 
@@ -44,7 +48,17 @@ function startServer(port) {
 
   // Sales
   app.post("/api/sales", (req, res) => {
-    const s = req.body; const sid = id(); const d = db();
+    const s = req.body; const d = db();
+    const now = new Date();
+    const yy = now.getFullYear().toString().slice(-2);
+    const mm = (now.getMonth() + 1).toString().padStart(2, '0');
+    const prefix = `${yy}${mm}-`;
+    const last = d.prepare("SELECT id FROM sales WHERE id LIKE ? ORDER BY id DESC LIMIT 1").get(prefix + '%');
+    let nextNum = 1;
+    if (last) {
+      nextNum = parseInt(last.id.slice(-6), 10) + 1;
+    }
+    const sid = `${prefix}${nextNum.toString().padStart(6, '0')}`;
     d.transaction(() => {
       d.prepare("INSERT INTO sales (id,customer_id,subtotal,discount,total,amount_paid,change,status) VALUES (?,?,?,?,?,?,?,?)").run(sid, s.customerId||null, s.subtotal, s.discount, s.total, s.amountPaid, Math.max(0,s.amountPaid-s.total), s.amountPaid>=s.total?"paid":"partial");
       const ii = d.prepare("INSERT INTO sale_items (id,sale_id,product_id,product_name,barcode,quantity,unit_price,subtotal) VALUES (?,?,?,?,?,?,?,?)");
@@ -184,6 +198,14 @@ function startServer(port) {
   app.put("/api/expenses/:id", (req, res) => { const e = req.body; db().prepare("UPDATE expenses SET title=?, category=?, amount=?, notes=?, date=? WHERE id=?").run(e.title, e.category, e.amount, e.notes||"", e.date, req.params.id); res.json(db().prepare("SELECT * FROM expenses WHERE id=?").get(req.params.id)); });
   app.delete("/api/expenses/:id", (req, res) => { db().prepare("DELETE FROM expenses WHERE id=?").run(req.params.id); res.json({ success: true }); });
 
+  // Auth
+  app.post("/api/auth/verify-password", (req, res) => {
+    const user = db().prepare("SELECT * FROM users WHERE role = 'admin' LIMIT 1").get();
+    if (!user) return res.json({ valid: false });
+    const { verifyPassword } = require("./database");
+    res.json({ valid: verifyPassword(req.body.password, user.password_hash) });
+  });
+
   // Dashboard
   app.get("/api/dashboard/stats", (_, res) => {
     const d = db(); const t = new Date().toISOString().split("T")[0];
@@ -195,6 +217,63 @@ function startServer(port) {
       weekRevenue: d.prepare("SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue FROM sales WHERE created_at>=datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day").all(),
       topProducts: d.prepare("SELECT si.product_name as name, SUM(si.quantity) as value FROM sale_items si GROUP BY si.product_name ORDER BY value DESC LIMIT 5").all(),
     });
+  });
+
+  // Settings - Backup
+  app.post("/api/settings/backup", (_, res) => {
+    try {
+      const dbPath = getDbPath();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const backupName = `faraz-pharmacy-backup-${timestamp}.db`;
+      const backupPath = path.join(BACKUPS_DIR, backupName);
+      fs.copyFileSync(dbPath, backupPath);
+      const stat = fs.statSync(backupPath);
+      res.json({ success: true, name: backupName, path: backupPath, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() });
+    } catch (err) {
+      res.json({ success: false, error: err.message });
+    }
+  });
+
+  app.get("/api/settings/backups", (_, res) => {
+    try {
+      if (!fs.existsSync(BACKUPS_DIR)) return res.json([]);
+      const files = fs.readdirSync(BACKUPS_DIR)
+        .filter(f => f.endsWith(".db"))
+        .map(f => {
+          const fp = path.join(BACKUPS_DIR, f);
+          const stat = fs.statSync(fp);
+          return { name: f, path: fp, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() };
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(files);
+    } catch (err) {
+      res.json([]);
+    }
+  });
+
+  app.delete("/api/settings/backup", (req, res) => {
+    try {
+      const fp = path.join(BACKUPS_DIR, req.body.name);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      res.json({ success: true });
+    } catch (err) {
+      res.json({ success: false, error: err.message });
+    }
+  });
+
+  // Settings - Google Drive
+  const { loadConfig, saveConfig } = require("./config");
+
+  app.get("/api/settings/gdrive", (_, res) => {
+    const cfg = loadConfig();
+    res.json(cfg.googleDrive || { clientId: "", clientSecret: "", redirectUri: "", refreshToken: "", autoUpload: false, connected: false });
+  });
+
+  app.put("/api/settings/gdrive", (req, res) => {
+    const cfg = loadConfig();
+    cfg.googleDrive = req.body;
+    saveConfig(cfg);
+    res.json({ success: true });
   });
 
   serverInstance = app.listen(port, "0.0.0.0", () => {

@@ -227,6 +227,11 @@ export interface ExpenseInput {
 
 export type DiscountType = "pkr" | "percent";
 
+export interface PrinterConfig {
+  paperSize: "thermal" | "a4" | "a5";
+  deviceName: string | null;
+}
+
 export interface DashboardStats {
   todayRevenue: number;
   totalArrears: number;

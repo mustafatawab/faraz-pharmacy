@@ -1,7 +1,10 @@
 const { ipcMain } = require("electron");
-const { getDatabase, verifyPassword, generateToken } = require("./database");
+const { getDatabase, verifyPassword, generateToken, getDataDir, getDbPath } = require("./database");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const id = () => crypto.randomUUID();
+const BACKUPS_DIR = path.join(getDataDir(), "backups");
 
 function cleanupExpiredTokens() {
   getDatabase().prepare("DELETE FROM auth_tokens WHERE refresh_expires_at < datetime('now')").run();
@@ -103,7 +106,16 @@ function registerHandlers() {
   // Sales
   ipcMain.handle("sales:create", (_, s) => {
     const db = getDatabase();
-    const sid = id();
+    const now = new Date();
+    const yy = now.getFullYear().toString().slice(-2);
+    const mm = (now.getMonth() + 1).toString().padStart(2, '0');
+    const prefix = `${yy}${mm}-`;
+    const last = db.prepare("SELECT id FROM sales WHERE id LIKE ? ORDER BY id DESC LIMIT 1").get(prefix + '%');
+    let nextNum = 1;
+    if (last) {
+      nextNum = parseInt(last.id.slice(-6), 10) + 1;
+    }
+    const sid = `${prefix}${nextNum.toString().padStart(6, '0')}`;
     const tr = db.transaction(() => {
       db.prepare("INSERT INTO sales (id,customer_id,subtotal,discount,total,amount_paid,change,status) VALUES (?,?,?,?,?,?,?,?)").run(sid, s.customerId||null, s.subtotal, s.discount, s.total, s.amountPaid, Math.max(0,s.amountPaid-s.total), s.amountPaid>=s.total?"paid":"partial");
       const ii = db.prepare("INSERT INTO sale_items (id,sale_id,product_id,product_name,barcode,quantity,unit_price,subtotal) VALUES (?,?,?,?,?,?,?,?)");
@@ -254,6 +266,72 @@ function registerHandlers() {
       weekRevenue: db.prepare("SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue FROM sales WHERE created_at>=datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day").all(),
       topProducts: db.prepare("SELECT si.product_name as name, SUM(si.quantity) as value FROM sale_items si GROUP BY si.product_name ORDER BY value DESC LIMIT 5").all(),
     };
+  });
+
+  // Verify admin password (for sensitive actions)
+  ipcMain.handle("auth:verify-password", (_, { password }) => {
+    const user = getDatabase().prepare("SELECT * FROM users WHERE role = 'admin' LIMIT 1").get();
+    if (!user) return { valid: false };
+    return { valid: verifyPassword(password, user.password_hash) };
+  });
+
+  // Settings - Backup
+  if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+
+  ipcMain.handle("settings:backup-create", () => {
+    try {
+      const dbPath = getDbPath();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const backupName = `faraz-pharmacy-backup-${timestamp}.db`;
+      const backupPath = path.join(BACKUPS_DIR, backupName);
+      fs.copyFileSync(dbPath, backupPath);
+      const stat = fs.statSync(backupPath);
+      return { success: true, name: backupName, path: backupPath, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("settings:backup-list", () => {
+    try {
+      if (!fs.existsSync(BACKUPS_DIR)) return [];
+      const files = fs.readdirSync(BACKUPS_DIR)
+        .filter(f => f.endsWith(".db"))
+        .map(f => {
+          const fp = path.join(BACKUPS_DIR, f);
+          const stat = fs.statSync(fp);
+          return { name: f, path: fp, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() };
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return files;
+    } catch (err) {
+      return [];
+    }
+  });
+
+  ipcMain.handle("settings:backup-delete", (_, { name }) => {
+    try {
+      const fp = path.join(BACKUPS_DIR, name);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Settings - Google Drive Config
+  const { loadConfig, saveConfig } = require("./config");
+
+  ipcMain.handle("settings:gdrive-get-config", () => {
+    const cfg = loadConfig();
+    return cfg.googleDrive || { clientId: "", clientSecret: "", redirectUri: "", refreshToken: "", autoUpload: false, connected: false };
+  });
+
+  ipcMain.handle("settings:gdrive-save-config", (_, gdriveCfg) => {
+    const cfg = loadConfig();
+    cfg.googleDrive = gdriveCfg;
+    saveConfig(cfg);
+    return { success: true };
   });
 }
 

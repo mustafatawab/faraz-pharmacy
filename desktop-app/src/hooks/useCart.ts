@@ -9,7 +9,8 @@ export function useCart() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [discountValue, setDiscountValue] = useState(0);
   const [discountType, setDiscountType] = useState<DiscountType>("pkr");
-  const [customerId, setCustomerId] = useState<string | undefined>();
+  const [customerId, setCustomerIdState] = useState<string | undefined>();
+  const [customerName, setCustomerName] = useState<string | undefined>();
 
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.subtotal, 0), [items]);
 
@@ -72,16 +73,22 @@ export function useCart() {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
   }
 
+  function setCustomer(id: string | undefined, name?: string) {
+    setCustomerIdState(id);
+    setCustomerName(name);
+  }
+
   function clearCart() {
     setItems([]);
     setDiscountValue(0);
     setDiscountType("pkr");
-    setCustomerId(undefined);
+    setCustomerIdState(undefined);
+    setCustomerName(undefined);
   }
 
   return {
-    items, discount, discountValue, discountType, subtotal, total, customerId,
-    setCustomerId, setDiscountValue, setDiscountType, toggleDiscountType,
+    items, discount, discountValue, discountType, subtotal, total, customerId, customerName,
+    setCustomer, setDiscountValue, setDiscountType, toggleDiscountType,
     addItem, updateQuantity, removeItem, clearCart,
   };
 }

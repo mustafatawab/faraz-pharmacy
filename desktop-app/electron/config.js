@@ -14,7 +14,7 @@ function loadConfig() {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(raw);
   } catch {
-    return { mode: null, serverUrl: "", serverPort: 3456 };
+    return { mode: null, serverUrl: "", serverPort: 3456, printer: { paperSize: "thermal", deviceName: null } };
   }
 }
 

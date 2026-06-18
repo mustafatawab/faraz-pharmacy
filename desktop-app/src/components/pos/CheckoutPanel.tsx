@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CartItem from "@/components/pos/CartItem";
 import { formatCurrency } from "@/lib/utils";
@@ -28,7 +29,7 @@ interface CheckoutPanelProps {
   onToggleDiscountType: () => void;
   onClearCart: () => void;
   onCheckout: (amountPaid: number, discount: number) => Promise<void>;
-  onCustomerChange: (customerId?: string) => void;
+  onCustomerChange: (customerId?: string, customerName?: string) => void;
   error?: string;
 }
 
@@ -52,7 +53,7 @@ export default function CheckoutPanel({
     mutationFn: () => api.customers.create({ name: quickName, phone: quickPhone, address: quickAddress }),
     onSuccess: (customer) => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
-      onCustomerChange(customer.id);
+      onCustomerChange(customer.id, customer.name);
       setQuickAddOpen(false);
       setQuickName("");
       setQuickPhone("");
@@ -61,17 +62,21 @@ export default function CheckoutPanel({
   });
   const [amountPaid, setAmountPaid] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [addToArrears, setAddToArrears] = useState(false);
 
   const numPaid = Number(amountPaid) || 0;
   const change = Math.max(0, numPaid - total);
+  const isPartial = numPaid > 0 && numPaid < total;
+  const canPay = items.length > 0 && (numPaid >= total || (isPartial && !!customerId && addToArrears));
 
   async function handleCheckout() {
-    if (items.length === 0 || numPaid < total) return;
+    if (!canPay) return;
     setProcessing(true);
     try {
       await onCheckout(numPaid, discount);
       onClearCart();
       setAmountPaid("");
+      setAddToArrears(false);
     } catch {
       console.error("Checkout failed");
     } finally {
@@ -116,7 +121,10 @@ export default function CheckoutPanel({
               <SearchableSelect
                 options={customers.map((c: Customer) => ({ value: c.id, label: `${c.name}${c.phone ? ` (${c.phone})` : ""}` }))}
                 value={customerId || ""}
-                onChange={(v) => onCustomerChange(v || undefined)}
+                onChange={(v) => {
+                  const selected = customers.find((c: Customer) => c.id === v);
+                  onCustomerChange(v || undefined, selected?.name);
+                }}
                 placeholder="Customer (optional)"
                 className="h-8 text-xs"
               />
@@ -211,15 +219,30 @@ export default function CheckoutPanel({
                 Change: {formatCurrency(change)}
               </motion.div>
             )}
+            {isPartial && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="add-to-arrears"
+                  checked={addToArrears}
+                  onCheckedChange={(val) => setAddToArrears(val === true)}
+                />
+                <Label htmlFor="add-to-arrears" className="text-xs cursor-pointer">
+                  Add Remaining Amount in Arears
+                </Label>
+              </div>
+            )}
             <Button
               className="w-full h-12 text-base gap-2"
-              disabled={items.length === 0 || numPaid < total || processing}
+              disabled={!canPay || processing}
               onClick={handleCheckout}
             >
               {processing ? "Processing..." : `Pay ${formatCurrency(total)}`}
             </Button>
-            {numPaid > 0 && numPaid < total && (
-              <p className="text-xs text-center text-danger">Insufficient payment</p>
+            {isPartial && !customerId && (
+              <p className="text-xs text-center text-danger">Select a customer for partial payment</p>
+            )}
+            {isPartial && !!customerId && !addToArrears && (
+              <p className="text-xs text-center text-text-secondary">Check the box above to add remaining amount to arrears</p>
             )}
             {error && (
               <p className="text-xs text-center text-danger">{error}</p>

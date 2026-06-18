@@ -18,6 +18,7 @@ import Returns from "@/pages/Returns";
 import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import Invoices from "@/pages/Invoices";
+import Settings from "@/pages/Settings";
 
 function AppShell() {
   const { isAuthenticated } = useAuth();
@@ -84,6 +85,7 @@ function AppShell() {
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/invoices" element={<Invoices />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
       </div>

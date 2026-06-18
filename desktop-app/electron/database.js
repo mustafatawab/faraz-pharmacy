@@ -175,4 +175,4 @@ function getDatabase() {
   return db;
 }
 
-module.exports = { initializeDatabase, getDatabase, verifyPassword, generateToken, hashPassword };
+module.exports = { initializeDatabase, getDatabase, verifyPassword, generateToken, hashPassword, getDataDir, getDbPath };

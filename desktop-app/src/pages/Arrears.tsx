@@ -17,8 +17,8 @@ import type { Arrear, Customer } from "@/types";
 
 async function verifyAdminPassword(password: string): Promise<boolean> {
   try {
-    const res = await window.authLogin({ username: "", password });
-    return !res.error;
+    const res = await api.auth.verifyPassword(password);
+    return res.valid;
   } catch {
     return false;
   }
