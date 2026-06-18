@@ -37,6 +37,11 @@ const defaultGDriveConfig: GDriveConfig = {
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const [locked, setLocked] = useState(true);
+  const [adminUser, setAdminUser] = useState("");
+  const [adminPass, setAdminPass] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
   const [backupStatus, setBackupStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [gdriveForm, setGdriveForm] = useState<GDriveConfig>(defaultGDriveConfig);
   const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; action: "create" | "restore"; backupName?: string }>({ open: false, action: "create" });
@@ -163,6 +168,52 @@ export default function Settings() {
     saveGdriveMutation.mutate(gdriveForm);
   }
 
+  async function handleAdminLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoginError("");
+    setLoggingIn(true);
+    try {
+      const res = await window.authLogin({ username: adminUser, password: adminPass });
+      if (res.error) {
+        setLoginError("Invalid admin credentials");
+        return;
+      }
+      setLocked(false);
+    } catch {
+      setLoginError("Authentication failed");
+    } finally {
+      setLoggingIn(false);
+    }
+  }
+
+  if (locked) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center space-y-2">
+            <Lock className="h-10 w-10 mx-auto text-accent" />
+            <h1 className="text-xl font-semibold">Admin Access Required</h1>
+            <p className="text-sm text-text-secondary">Enter admin credentials to access settings</p>
+          </div>
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="settings-admin-user">Username</Label>
+              <Input id="settings-admin-user" value={adminUser} onChange={(e) => setAdminUser(e.target.value)} autoFocus />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="settings-admin-pass">Password</Label>
+              <Input id="settings-admin-pass" type="password" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} />
+            </div>
+            {loginError && <p className="text-sm text-danger">{loginError}</p>}
+            <Button type="submit" className="w-full" disabled={loggingIn || !adminUser || !adminPass}>
+              {loggingIn ? "Verifying..." : "Unlock Settings"}
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   const totalBackupSize = backups.reduce((sum: number, b: BackupEntry) => sum + b.size, 0);
 
   return (
@@ -233,9 +284,11 @@ export default function Settings() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 rounded-lg border border-border bg-surface-2/50 px-3 py-2 text-sm font-mono text-text-secondary truncate">
-                    {backupDirectory || "Loading..."}
-                  </div>
+                  <Input
+                    value={backupDirectory || "Loading..."}
+                    readOnly
+                    className="flex-1 font-mono text-sm"
+                  />
                   <Button variant="outline" onClick={handlePickDirectory} className="gap-2 shrink-0">
                     <FolderOpen className="h-4 w-4" />
                     Change
