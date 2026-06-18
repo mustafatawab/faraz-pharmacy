@@ -7,27 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { downloadCSV, downloadPDF } from "@/lib/export";
 import StatusBadge from "@/components/shared/StatusBadge";
 import type { Sale } from "@/types";
-
-function today() {
-  return new Date().toISOString().split("T")[0];
-}
-
-function csvEscape(val: unknown): string {
-  const s = String(val ?? "");
-  return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function downloadBlob(content: string, filename: string, type: string) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 export default function Invoices() {
   const [search, setSearch] = useState("");
@@ -39,15 +21,23 @@ export default function Invoices() {
     queryFn: () => api.sales.listAll({ search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
   });
 
-  const handleExportCSV = useCallback(() => {
+  const exportData = useCallback(() => {
     const headers = ["Sale ID", "Date", "Customer", "Items", "Subtotal", "Discount", "Total", "Paid", "Change", "Status"];
-    const rows = sales.map((s: Sale) => [
+    return sales.map((s: Sale) => [
       s.id, s.created_at, s.customer_name || "Walk-in",
       s.items?.length ?? 0, s.subtotal, s.discount, s.total, s.amount_paid, s.change, s.status,
     ]);
-    const csv = [headers, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
-    downloadBlob(csv, `invoices_${dateFrom || "all"}_${dateTo || "all"}.csv`, "text/csv");
-  }, [sales, dateFrom, dateTo]);
+  }, [sales]);
+
+  const handleExportCSV = useCallback(() => {
+    const headers = ["Sale ID", "Date", "Customer", "Items", "Subtotal", "Discount", "Total", "Paid", "Change", "Status"];
+    downloadCSV(`invoices_${dateFrom || "all"}_${dateTo || "all"}.csv`, headers, exportData());
+  }, [exportData, dateFrom, dateTo]);
+
+  const handleExportPDF = useCallback(() => {
+    const headers = ["Sale ID", "Date", "Customer", "Items", "Subtotal", "Discount", "Total", "Paid", "Change", "Status"];
+    downloadPDF(`invoices_${dateFrom || "all"}_${dateTo || "all"}.pdf`, "Invoices & Billing", headers, exportData());
+  }, [exportData, dateFrom, dateTo]);
 
   const columns = [
     { key: "created_at", header: "Date", cell: (s: Sale) => <span className="font-mono text-xs text-text-secondary">{formatDateTime(s.created_at)}</span> },
@@ -78,7 +68,7 @@ export default function Invoices() {
         <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={sales.length === 0}>
           <Download className="h-4 w-4 mr-1" /> CSV
         </Button>
-        <Button variant="outline" size="sm" disabled={sales.length === 0}>
+        <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={sales.length === 0}>
           <FileText className="h-4 w-4 mr-1" /> PDF
         </Button>
       </div>
