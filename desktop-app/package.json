@@ -6,7 +6,7 @@
   "repository": "mustafatawab/faraz-pharmacy",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:renderer\" \"powershell -Command \\\"Start-Sleep 3\\\" && npm run dev:electron\"",
+    "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:electron\"",
     "dev:renderer": "vite",
     "dev:electron": "nodemon --watch electron -e js --exec \"electron . --dev\"",
     "build": "vite build && electron-builder",

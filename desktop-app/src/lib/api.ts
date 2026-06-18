@@ -140,6 +140,10 @@ const api = {
       isClient() ? fetchJson("GET", "/api/settings/backups") : window.electronAPI.settings.backupList(),
     backupDelete: (name: string): Promise<{ success: boolean; error?: string }> =>
       isClient() ? fetchJson("DELETE", "/api/settings/backup", { name }) : window.electronAPI.settings.backupDelete(name),
+    backupDirectoryPick: (): Promise<{ canceled: boolean; path?: string }> =>
+      isClient() ? fetchJson("POST", "/api/settings/backup/directory-pick") : window.electronAPI.settings.backupDirectoryPick(),
+    getBackupDirectory: (): Promise<{ path: string }> =>
+      isClient() ? fetchJson("GET", "/api/settings/backup/directory") : window.electronAPI.settings.getBackupDirectory(),
     gdriveGetConfig: (): Promise<GDriveConfig> =>
       isClient() ? fetchJson("GET", "/api/settings/gdrive") : window.electronAPI.settings.gdriveGetConfig(),
     gdriveSaveConfig: (cfg: GDriveConfig): Promise<{ success: boolean }> =>

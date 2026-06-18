@@ -1,12 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { getDatabase, getDataDir, getDbPath } = require("./database");
+const { getDatabase, getDbPath } = require("./database");
+const { getBackupsDir } = require("./config");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const id = () => crypto.randomUUID();
-const BACKUPS_DIR = path.join(getDataDir(), "backups");
-if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
 let serverInstance;
 
@@ -222,10 +221,12 @@ function startServer(port) {
   // Settings - Backup
   app.post("/api/settings/backup", (_, res) => {
     try {
+      const dir = getBackupsDir();
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const dbPath = getDbPath();
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       const backupName = `faraz-pharmacy-backup-${timestamp}.db`;
-      const backupPath = path.join(BACKUPS_DIR, backupName);
+      const backupPath = path.join(dir, backupName);
       fs.copyFileSync(dbPath, backupPath);
       const stat = fs.statSync(backupPath);
       res.json({ success: true, name: backupName, path: backupPath, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() });
@@ -236,11 +237,12 @@ function startServer(port) {
 
   app.get("/api/settings/backups", (_, res) => {
     try {
-      if (!fs.existsSync(BACKUPS_DIR)) return res.json([]);
-      const files = fs.readdirSync(BACKUPS_DIR)
+      const dir = getBackupsDir();
+      if (!fs.existsSync(dir)) return res.json([]);
+      const files = fs.readdirSync(dir)
         .filter(f => f.endsWith(".db"))
         .map(f => {
-          const fp = path.join(BACKUPS_DIR, f);
+          const fp = path.join(dir, f);
           const stat = fs.statSync(fp);
           return { name: f, path: fp, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() };
         })
@@ -253,12 +255,20 @@ function startServer(port) {
 
   app.delete("/api/settings/backup", (req, res) => {
     try {
-      const fp = path.join(BACKUPS_DIR, req.body.name);
+      const fp = path.join(getBackupsDir(), req.body.name);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
       res.json({ success: true });
     } catch (err) {
       res.json({ success: false, error: err.message });
     }
+  });
+
+  app.post("/api/settings/backup/directory-pick", (_, res) => {
+    res.json({ canceled: true, error: "Not available in server mode" });
+  });
+
+  app.get("/api/settings/backup/directory", (_, res) => {
+    res.json({ path: getBackupsDir() });
   });
 
   // Settings - Google Drive

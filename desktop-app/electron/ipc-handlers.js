@@ -1,10 +1,10 @@
-const { ipcMain } = require("electron");
-const { getDatabase, verifyPassword, generateToken, getDataDir, getDbPath } = require("./database");
+const { ipcMain, dialog } = require("electron");
+const { getDatabase, verifyPassword, generateToken, getDbPath } = require("./database");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const id = () => crypto.randomUUID();
-const BACKUPS_DIR = path.join(getDataDir(), "backups");
+const { getBackupsDir, saveConfig, loadConfig } = require("./config");
 
 function cleanupExpiredTokens() {
   getDatabase().prepare("DELETE FROM auth_tokens WHERE refresh_expires_at < datetime('now')").run();
@@ -276,14 +276,17 @@ function registerHandlers() {
   });
 
   // Settings - Backup
-  if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+  const backupsDir = getBackupsDir();
+  if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
 
   ipcMain.handle("settings:backup-create", () => {
     try {
+      const dir = getBackupsDir();
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const dbPath = getDbPath();
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       const backupName = `faraz-pharmacy-backup-${timestamp}.db`;
-      const backupPath = path.join(BACKUPS_DIR, backupName);
+      const backupPath = path.join(dir, backupName);
       fs.copyFileSync(dbPath, backupPath);
       const stat = fs.statSync(backupPath);
       return { success: true, name: backupName, path: backupPath, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() };
@@ -294,11 +297,12 @@ function registerHandlers() {
 
   ipcMain.handle("settings:backup-list", () => {
     try {
-      if (!fs.existsSync(BACKUPS_DIR)) return [];
-      const files = fs.readdirSync(BACKUPS_DIR)
+      const dir = getBackupsDir();
+      if (!fs.existsSync(dir)) return [];
+      const files = fs.readdirSync(dir)
         .filter(f => f.endsWith(".db"))
         .map(f => {
-          const fp = path.join(BACKUPS_DIR, f);
+          const fp = path.join(dir, f);
           const stat = fs.statSync(fp);
           return { name: f, path: fp, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() };
         })
@@ -311,7 +315,7 @@ function registerHandlers() {
 
   ipcMain.handle("settings:backup-delete", (_, { name }) => {
     try {
-      const fp = path.join(BACKUPS_DIR, name);
+      const fp = path.join(getBackupsDir(), name);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
       return { success: true };
     } catch (err) {
@@ -319,8 +323,21 @@ function registerHandlers() {
     }
   });
 
+  ipcMain.handle("settings:backup-directory-pick", async () => {
+    const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true };
+    const selectedPath = result.filePaths[0];
+    const cfg = loadConfig();
+    cfg.backupDirectory = selectedPath;
+    saveConfig(cfg);
+    return { canceled: false, path: selectedPath };
+  });
+
+  ipcMain.handle("settings:get-backup-directory", () => {
+    return { path: getBackupsDir() };
+  });
+
   // Settings - Google Drive Config
-  const { loadConfig, saveConfig } = require("./config");
 
   ipcMain.handle("settings:gdrive-get-config", () => {
     const cfg = loadConfig();

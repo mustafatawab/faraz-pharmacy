@@ -14,8 +14,13 @@ function loadConfig() {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
     return JSON.parse(raw);
   } catch {
-    return { mode: null, serverUrl: "", serverPort: 3456, printer: { paperSize: "thermal", deviceName: null } };
+    return { mode: null, serverUrl: "", serverPort: 3456, printer: { paperSize: "thermal", deviceName: null }, backupDirectory: "" };
   }
+}
+
+function getBackupsDir() {
+  const cfg = loadConfig();
+  return cfg.backupDirectory || path.join(os.homedir(), ".faraz-pharmacy", "backups");
 }
 
 function saveConfig(config) {
@@ -27,4 +32,4 @@ function isConfigured() {
   return loadConfig().mode !== null;
 }
 
-module.exports = { loadConfig, saveConfig, isConfigured };
+module.exports = { loadConfig, saveConfig, isConfigured, getBackupsDir };

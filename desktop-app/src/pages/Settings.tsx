@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Database, HardDrive, Trash2, RefreshCw, CheckCircle2, XCircle,
-  Cloud, CloudOff, Loader2, Link2, Link2Off, Lock,
+  Cloud, CloudOff, Loader2, Link2, Link2Off, Lock, FolderOpen,
 } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -41,10 +41,20 @@ export default function Settings() {
   const [passwordDialog, setPasswordDialog] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [backupDirectory, setBackupDirectory] = useState("");
 
   const { data: backups = [], isLoading: backupsLoading } = useQuery({
     queryKey: ["settings", "backups"],
     queryFn: api.settings.backupList,
+  });
+
+  useQuery({
+    queryKey: ["settings", "backup-directory"],
+    queryFn: async () => {
+      const res = await api.settings.getBackupDirectory();
+      setBackupDirectory(res.path);
+      return res;
+    },
   });
 
   const { data: gdriveConfig, isLoading: gdriveLoading } = useQuery({
@@ -82,6 +92,13 @@ export default function Settings() {
     mutationFn: (cfg: GDriveConfig) => api.settings.gdriveSaveConfig(cfg),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settings", "gdrive"] }),
   });
+
+  async function handlePickDirectory() {
+    const res = await api.settings.backupDirectoryPick();
+    if (!res.canceled && res.path) {
+      setBackupDirectory(res.path);
+    }
+  }
 
   async function handleBackupWithPassword() {
     setPasswordError("");
@@ -164,6 +181,29 @@ export default function Settings() {
                       {backupStatus.message}
                     </div>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FolderOpen className="h-5 w-5 text-accent" />
+                  Backup Location
+                </CardTitle>
+                <CardDescription>
+                  Choose where backup files are saved.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 rounded-lg border border-border bg-surface-2/50 px-3 py-2 text-sm font-mono text-text-secondary truncate">
+                    {backupDirectory || "Loading..."}
+                  </div>
+                  <Button variant="outline" onClick={handlePickDirectory} className="gap-2 shrink-0">
+                    <FolderOpen className="h-4 w-4" />
+                    Change
+                  </Button>
                 </div>
               </CardContent>
             </Card>
