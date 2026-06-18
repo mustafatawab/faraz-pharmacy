@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     backupCreate: () => ipcRenderer.invoke("settings:backup-create"),
     backupList: () => ipcRenderer.invoke("settings:backup-list"),
     backupDelete: (name) => ipcRenderer.invoke("settings:backup-delete", { name }),
+    backupRestore: (name) => ipcRenderer.invoke("settings:backup-restore", { name }),
     backupDirectoryPick: () => ipcRenderer.invoke("settings:backup-directory-pick"),
     getBackupDirectory: () => ipcRenderer.invoke("settings:get-backup-directory"),
     gdriveGetConfig: () => ipcRenderer.invoke("settings:gdrive-get-config"),

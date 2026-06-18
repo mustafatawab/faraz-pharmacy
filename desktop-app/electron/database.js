@@ -175,4 +175,20 @@ function getDatabase() {
   return db;
 }
 
-module.exports = { initializeDatabase, getDatabase, verifyPassword, generateToken, hashPassword, getDataDir, getDbPath };
+function closeDatabase() {
+  if (db) {
+    db.close();
+    db = null;
+  }
+}
+
+function restoreDatabase(backupPath) {
+  if (!fs.existsSync(backupPath)) throw new Error("Backup file not found");
+  closeDatabase();
+  const dbPath = getDbPath();
+  fs.copyFileSync(backupPath, dbPath);
+  initializeDatabase();
+  return true;
+}
+
+module.exports = { initializeDatabase, getDatabase, verifyPassword, generateToken, hashPassword, getDataDir, getDbPath, closeDatabase, restoreDatabase };

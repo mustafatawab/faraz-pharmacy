@@ -140,6 +140,8 @@ const api = {
       isClient() ? fetchJson("GET", "/api/settings/backups") : window.electronAPI.settings.backupList(),
     backupDelete: (name: string): Promise<{ success: boolean; error?: string }> =>
       isClient() ? fetchJson("DELETE", "/api/settings/backup", { name }) : window.electronAPI.settings.backupDelete(name),
+    backupRestore: (name: string): Promise<{ success: boolean; error?: string }> =>
+      isClient() ? fetchJson("POST", "/api/settings/backup/restore", { name }) : window.electronAPI.settings.backupRestore(name),
     backupDirectoryPick: (): Promise<{ canceled: boolean; path?: string }> =>
       isClient() ? fetchJson("POST", "/api/settings/backup/directory-pick") : window.electronAPI.settings.backupDirectoryPick(),
     getBackupDirectory: (): Promise<{ path: string }> =>

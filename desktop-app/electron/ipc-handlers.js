@@ -1,5 +1,5 @@
 const { ipcMain, dialog } = require("electron");
-const { getDatabase, verifyPassword, generateToken, getDbPath } = require("./database");
+const { getDatabase, verifyPassword, generateToken, getDbPath, restoreDatabase } = require("./database");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -317,6 +317,16 @@ function registerHandlers() {
     try {
       const fp = path.join(getBackupsDir(), name);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("settings:backup-restore", (_, { name }) => {
+    try {
+      const backupPath = path.join(getBackupsDir(), name);
+      restoreDatabase(backupPath);
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };

@@ -78,6 +78,7 @@ export interface ElectronAPI {
     backupCreate(): Promise<BackupResult>;
     backupList(): Promise<BackupEntry[]>;
     backupDelete(name: string): Promise<{ success: boolean; error?: string }>;
+    backupRestore(name: string): Promise<{ success: boolean; error?: string }>;
     backupDirectoryPick(): Promise<{ canceled: boolean; path?: string }>;
     getBackupDirectory(): Promise<{ path: string }>;
     gdriveGetConfig(): Promise<GDriveConfig>;

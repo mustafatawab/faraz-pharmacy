@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { getDatabase, getDbPath } = require("./database");
+const { getDatabase, getDbPath, restoreDatabase } = require("./database");
 const { getBackupsDir } = require("./config");
 const crypto = require("crypto");
 const fs = require("fs");
@@ -257,6 +257,16 @@ function startServer(port) {
     try {
       const fp = path.join(getBackupsDir(), req.body.name);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      res.json({ success: true });
+    } catch (err) {
+      res.json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/settings/backup/restore", (req, res) => {
+    try {
+      const backupPath = path.join(getBackupsDir(), req.body.name);
+      restoreDatabase(backupPath);
       res.json({ success: true });
     } catch (err) {
       res.json({ success: false, error: err.message });

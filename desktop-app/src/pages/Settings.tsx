@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Database, HardDrive, Trash2, RefreshCw, CheckCircle2, XCircle,
-  Cloud, CloudOff, Loader2, Link2, Link2Off, Lock, FolderOpen,
+  Cloud, CloudOff, Loader2, Link2, Link2Off, Lock, FolderOpen, RotateCcw,
 } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -38,7 +38,7 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const [backupStatus, setBackupStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [gdriveForm, setGdriveForm] = useState<GDriveConfig>(defaultGDriveConfig);
-  const [passwordDialog, setPasswordDialog] = useState(false);
+  const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; action: "create" | "restore"; backupName?: string }>({ open: false, action: "create" });
   const [adminPassword, setAdminPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [backupDirectory, setBackupDirectory] = useState("");
@@ -83,6 +83,19 @@ export default function Settings() {
     },
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: (name: string) => api.settings.backupRestore(name),
+    onSuccess: () => {
+      setBackupStatus({ type: "success", message: "Database restored from backup successfully." });
+      queryClient.invalidateQueries({ queryKey: ["settings", "backups"] });
+      setTimeout(() => setBackupStatus(null), 5000);
+    },
+    onError: (err: Error) => {
+      setBackupStatus({ type: "error", message: err.message });
+      setTimeout(() => setBackupStatus(null), 5000);
+    },
+  });
+
   const deleteBackupMutation = useMutation({
     mutationFn: (name: string) => api.settings.backupDelete(name),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settings", "backups"] }),
@@ -100,16 +113,21 @@ export default function Settings() {
     }
   }
 
-  async function handleBackupWithPassword() {
+  async function handlePasswordConfirmed() {
     setPasswordError("");
     const ok = await verifyAdminPassword(adminPassword);
     if (!ok) {
       setPasswordError("Incorrect admin password");
       return;
     }
-    setPasswordDialog(false);
+    const { action, backupName } = passwordDialog;
+    setPasswordDialog({ open: false, action: "create" });
     setAdminPassword("");
-    backupMutation.mutate();
+    if (action === "restore" && backupName) {
+      restoreMutation.mutate(backupName);
+    } else {
+      backupMutation.mutate();
+    }
   }
 
   function handleConnect() {
@@ -160,7 +178,7 @@ export default function Settings() {
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3">
                   <Button
-                    onClick={() => { setAdminPassword(""); setPasswordError(""); setPasswordDialog(true); }}
+                    onClick={() => { setAdminPassword(""); setPasswordError(""); setPasswordDialog({ open: true, action: "create" }); }}
                     disabled={backupMutation.isPending}
                     className="gap-2"
                   >
@@ -232,26 +250,44 @@ export default function Settings() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {backups.map((backup: BackupEntry) => (
-                      <div key={backup.name} className="flex items-center justify-between rounded-lg border border-border bg-surface-2/50 px-4 py-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Database className="h-4 w-4 shrink-0 text-text-secondary" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-text-primary truncate">{backup.name}</p>
-                            <p className="text-xs text-text-secondary">
-                              {formatDateTime(backup.createdAt)} — {formatFileSize(backup.size)}
-                            </p>
+                    {backups.map((backup: BackupEntry) => {
+                      const label = backup.name
+                        .replace(/^faraz-pharmacy-backup-/, "")
+                        .replace(/\.db$/, "")
+                        .replace(/T/, " ")
+                        .replace(/-/g, ":");
+                      return (
+                        <div key={backup.name} className="flex items-center justify-between rounded-lg border border-border bg-surface-2/50 px-4 py-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Database className="h-4 w-4 shrink-0 text-text-secondary" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-text-primary truncate">
+                                {label}
+                              </p>
+                              <p className="text-xs text-text-secondary">
+                                {formatDateTime(backup.createdAt)} — {formatFileSize(backup.size)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => { setAdminPassword(""); setPasswordError(""); setPasswordDialog({ open: true, action: "restore", backupName: backup.name }); }}
+                              className="h-8 w-8 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors"
+                              title="Restore from this backup"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { if (confirm("Delete this backup?")) deleteBackupMutation.mutate(backup.name); }}
+                              className="h-8 w-8 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors"
+                              title="Delete backup"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
-                        <button
-                          onClick={() => { if (confirm("Delete this backup?")) deleteBackupMutation.mutate(backup.name); }}
-                          className="h-8 w-8 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors shrink-0"
-                          title="Delete backup"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -369,14 +405,18 @@ export default function Settings() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={passwordDialog} onOpenChange={(o) => { if (!o) { setPasswordDialog(false); setAdminPassword(""); setPasswordError(""); } }}>
+      <Dialog open={passwordDialog.open} onOpenChange={(o) => { if (!o) { setPasswordDialog({ open: false, action: "create" }); setAdminPassword(""); setPasswordError(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Lock className="h-4 w-4" />
               Admin Password Required
             </DialogTitle>
-            <DialogDescription>Enter your admin password to create a database backup.</DialogDescription>
+            <DialogDescription>
+              {passwordDialog.action === "restore"
+                ? "Restoring will overwrite the current database. Enter your admin password to confirm."
+                : "Enter your admin password to create a database backup."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -386,13 +426,13 @@ export default function Settings() {
                 onChange={(e) => setAdminPassword(e.target.value)}
                 placeholder="Enter password"
                 autoFocus
-                onKeyDown={(e) => { if (e.key === "Enter") handleBackupWithPassword(); }}
+                onKeyDown={(e) => { if (e.key === "Enter") handlePasswordConfirmed(); }}
               />
             </div>
             {passwordError && <p className="text-sm text-danger">{passwordError}</p>}
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => { setPasswordDialog(false); setAdminPassword(""); setPasswordError(""); }}>Cancel</Button>
-              <Button onClick={handleBackupWithPassword} disabled={!adminPassword}>Confirm</Button>
+              <Button variant="outline" onClick={() => { setPasswordDialog({ open: false, action: "create" }); setAdminPassword(""); setPasswordError(""); }}>Cancel</Button>
+              <Button onClick={handlePasswordConfirmed} disabled={!adminPassword}>Confirm</Button>
             </div>
           </div>
         </DialogContent>
