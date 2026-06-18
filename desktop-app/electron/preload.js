@@ -92,3 +92,5 @@ contextBridge.exposeInMainWorld("authLogout", (data) => ipcRenderer.invoke("auth
 contextBridge.exposeInMainWorld("authRefresh", (data) => ipcRenderer.invoke("auth:refresh", data));
 contextBridge.exposeInMainWorld("authMe", (data) => ipcRenderer.invoke("auth:me", data));
 contextBridge.exposeInMainWorld("verifyAdminPassword", (password) => ipcRenderer.invoke("auth:verify-password", { password }));
+contextBridge.exposeInMainWorld("generateRecoveryKey", () => ipcRenderer.invoke("auth:generate-recovery-key"));
+contextBridge.exposeInMainWorld("recoverPassword", (phrase, newPassword) => ipcRenderer.invoke("auth:recover-password", { phrase, newPassword }));

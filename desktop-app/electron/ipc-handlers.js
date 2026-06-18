@@ -275,6 +275,36 @@ function registerHandlers() {
     return { valid: verifyPassword(password, user.password_hash) };
   });
 
+  // Recovery key
+  const { generateRecoveryPhrase, hashRecoveryPhrase, verifyRecoveryPhrase } = require("./database");
+
+  ipcMain.handle("auth:generate-recovery-key", () => {
+    const db = getDatabase();
+    const existing = db.prepare("SELECT COUNT(*) as c FROM recovery_keys WHERE used_at IS NULL").get();
+    if (existing.c > 0) {
+      db.prepare("UPDATE recovery_keys SET used_at = datetime('now') WHERE used_at IS NULL").run();
+    }
+    const phrase = generateRecoveryPhrase();
+    const keyHash = hashRecoveryPhrase(phrase);
+    db.prepare("INSERT INTO recovery_keys (id, key_hash) VALUES (?, ?)").run(id(), keyHash);
+    return { phrase };
+  });
+
+  ipcMain.handle("auth:recover-password", (_, { phrase, newPassword }) => {
+    const db = getDatabase();
+    const key = verifyRecoveryPhrase(phrase);
+    if (!key) return { error: "Invalid recovery key" };
+    const user = db.prepare("SELECT * FROM users WHERE role = 'admin' LIMIT 1").get();
+    if (!user) return { error: "No admin user found" };
+    const { hashPassword } = require("./database");
+    db.transaction(() => {
+      db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(newPassword), user.id);
+      db.prepare("UPDATE recovery_keys SET used_at = datetime('now') WHERE id = ?").run(key.id);
+      db.prepare("DELETE FROM auth_tokens WHERE user_id = ?").run(user.id);
+    })();
+    return { success: true };
+  });
+
   // Settings - Backup
   const backupsDir = getBackupsDir();
   if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });

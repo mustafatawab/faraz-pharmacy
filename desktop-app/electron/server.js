@@ -205,6 +205,34 @@ function startServer(port) {
     res.json({ valid: verifyPassword(req.body.password, user.password_hash) });
   });
 
+  app.post("/api/auth/generate-recovery-key", (_, res) => {
+    const { generateRecoveryPhrase, hashRecoveryPhrase } = require("./database");
+    const d = db();
+    const existing = d.prepare("SELECT COUNT(*) as c FROM recovery_keys WHERE used_at IS NULL").get();
+    if (existing.c > 0) {
+      d.prepare("UPDATE recovery_keys SET used_at = datetime('now') WHERE used_at IS NULL").run();
+    }
+    const phrase = generateRecoveryPhrase();
+    const keyHash = hashRecoveryPhrase(phrase);
+    d.prepare("INSERT INTO recovery_keys (id, key_hash) VALUES (?, ?)").run(id(), keyHash);
+    res.json({ phrase });
+  });
+
+  app.post("/api/auth/recover-password", (req, res) => {
+    const d = db();
+    const { verifyRecoveryPhrase, hashPassword } = require("./database");
+    const key = verifyRecoveryPhrase(req.body.phrase);
+    if (!key) return res.status(400).json({ error: "Invalid recovery key" });
+    const user = d.prepare("SELECT * FROM users WHERE role = 'admin' LIMIT 1").get();
+    if (!user) return res.status(400).json({ error: "No admin user found" });
+    d.transaction(() => {
+      d.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(req.body.newPassword), user.id);
+      d.prepare("UPDATE recovery_keys SET used_at = datetime('now') WHERE id = ?").run(key.id);
+      d.prepare("DELETE FROM auth_tokens WHERE user_id = ?").run(user.id);
+    })();
+    res.json({ success: true });
+  });
+
   // Dashboard
   app.get("/api/dashboard/stats", (_, res) => {
     const d = db(); const t = new Date().toISOString().split("T")[0];

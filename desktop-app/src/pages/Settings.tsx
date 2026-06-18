@@ -48,6 +48,7 @@ export default function Settings() {
   const [adminPassword, setAdminPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [backupDirectory, setBackupDirectory] = useState("");
+  const [recoveryDialog, setRecoveryDialog] = useState<{ open: boolean; phrase: string }>({ open: false, phrase: "" });
 
   const { data: backups = [], isLoading: backupsLoading } = useQuery({
     queryKey: ["settings", "backups"],
@@ -128,6 +129,15 @@ export default function Settings() {
       toast.error(err.message);
     },
   });
+
+  async function handleGenerateRecoveryKey() {
+    try {
+      const res = await api.auth.generateRecoveryKey();
+      setRecoveryDialog({ open: true, phrase: res.phrase });
+    } catch (err) {
+      toast.error("Failed to generate recovery key");
+    }
+  }
 
   async function handlePickDirectory() {
     const res = await api.settings.backupDirectoryPick();
@@ -292,6 +302,26 @@ export default function Settings() {
                   <Button variant="outline" onClick={handlePickDirectory} className="gap-2 shrink-0">
                     <FolderOpen className="h-4 w-4" />
                     Change
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Lock className="h-5 w-5 text-accent" />
+                  Recovery Key
+                </CardTitle>
+                <CardDescription>
+                  Generate a one-time recovery key to reset your admin password if you forget it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" onClick={handleGenerateRecoveryKey} className="gap-2">
+                    <RefreshCw className="h-4 w-4" />
+                    Generate New Key
                   </Button>
                 </div>
               </CardContent>
@@ -504,6 +534,34 @@ export default function Settings() {
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => { setPasswordDialog({ open: false, action: "create" }); setAdminPassword(""); setPasswordError(""); }}>Cancel</Button>
               <Button onClick={handlePasswordConfirmed} disabled={!adminPassword}>Confirm</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={recoveryDialog.open} onOpenChange={(o) => { if (!o) setRecoveryDialog({ open: false, phrase: "" }); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Recovery Key Generated
+            </DialogTitle>
+            <DialogDescription>
+              This is your one-time recovery key. Save it somewhere safe — it will never be shown again.
+              Use it on the login screen if you forget your password.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg bg-surface-2/80 p-4">
+              <p className="text-sm font-mono leading-relaxed select-all text-center">
+                {recoveryDialog.phrase}
+              </p>
+            </div>
+            <p className="text-xs text-danger text-center font-medium">
+              This key will never be shown again. Write it down or save it now.
+            </p>
+            <div className="flex justify-end">
+              <Button onClick={() => setRecoveryDialog({ open: false, phrase: "" })}>I've Saved It</Button>
             </div>
           </div>
         </DialogContent>

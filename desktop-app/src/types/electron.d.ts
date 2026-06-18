@@ -142,5 +142,7 @@ declare global {
     authRefresh: (data: { refreshToken: string | null }) => Promise<AuthResponse>;
     authMe: (data: { accessToken: string }) => Promise<AuthResponse>;
     verifyAdminPassword: (password: string) => Promise<{ valid: boolean }>;
+    generateRecoveryKey: () => Promise<{ phrase: string }>;
+    recoverPassword: (phrase: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   }
 }

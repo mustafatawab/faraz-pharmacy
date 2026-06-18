@@ -35,6 +35,34 @@ function generateToken() {
   return crypto.randomUUID() + crypto.randomUUID();
 }
 
+const WORDS = require("./wordlist");
+
+function generateRecoveryPhrase() {
+  const bytes = crypto.randomBytes(16);
+  const indices = [];
+  for (let i = 0; i < 12; i++) {
+    const idx = (bytes[i * 2] << 8 | bytes[i * 2 + 1]) % WORDS.length;
+    indices.push(idx);
+  }
+  return indices.map((i) => WORDS[i]).join(" ");
+}
+
+function hashRecoveryPhrase(phrase) {
+  const normalized = phrase.trim().toLowerCase().replace(/\s+/g, " ");
+  return hashPassword(normalized);
+}
+
+function verifyRecoveryPhrase(phrase) {
+  const normalized = phrase.trim().toLowerCase().replace(/\s+/g, " ");
+  const keys = getDatabase().prepare("SELECT * FROM recovery_keys WHERE used_at IS NULL").all();
+  for (const key of keys) {
+    if (verifyPassword(normalized, key.key_hash)) {
+      return key;
+    }
+  }
+  return null;
+}
+
 function initializeDatabase() {
   const Database = require("better-sqlite3");
   db = new Database(getDbPath());
@@ -129,6 +157,15 @@ function initializeDatabase() {
   try { db.exec("ALTER TABLE stock_purchases ADD COLUMN company_id TEXT REFERENCES companies(id)"); } catch {}
   try { db.exec("ALTER TABLE stock_purchases ADD COLUMN invoice_number TEXT NOT NULL DEFAULT ''"); } catch {}
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS recovery_keys (
+      id TEXT PRIMARY KEY,
+      key_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      used_at TEXT
+    );
+  `);
+
   const userCount = db.prepare("SELECT COUNT(*) as c FROM users").get();
   if (userCount.c === 0) seed();
 
@@ -191,4 +228,4 @@ function restoreDatabase(backupPath) {
   return true;
 }
 
-module.exports = { initializeDatabase, getDatabase, verifyPassword, generateToken, hashPassword, getDataDir, getDbPath, closeDatabase, restoreDatabase };
+module.exports = { initializeDatabase, getDatabase, verifyPassword, generateToken, hashPassword, getDataDir, getDbPath, closeDatabase, restoreDatabase, generateRecoveryPhrase, hashRecoveryPhrase, verifyRecoveryPhrase };

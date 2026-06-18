@@ -128,6 +128,10 @@ const api = {
   auth: {
     verifyPassword: (password: string): Promise<{ valid: boolean }> =>
       isClient() ? fetchJson("POST", "/api/auth/verify-password", { password }) : window.verifyAdminPassword(password),
+    generateRecoveryKey: (): Promise<{ phrase: string }> =>
+      isClient() ? fetchJson("POST", "/api/auth/generate-recovery-key") : window.generateRecoveryKey(),
+    recoverPassword: (phrase: string, newPassword: string): Promise<{ success: boolean; error?: string }> =>
+      isClient() ? fetchJson("POST", "/api/auth/recover-password", { phrase, newPassword }) : window.recoverPassword(phrase, newPassword),
   },
   dashboard: {
     stats: (): Promise<DashboardStats> =>
