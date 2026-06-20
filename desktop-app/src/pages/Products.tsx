@@ -243,7 +243,7 @@ export default function Products() {
             )}
             <div>
               <Label>Expiry (optional)</Label>
-              <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} />
+              <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} min={new Date().toISOString().split("T")[0]} />
             </div>
             <Button className="w-full mt-2" disabled={!form.name || !form.purchasePrice || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>

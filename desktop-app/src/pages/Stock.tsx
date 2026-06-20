@@ -185,7 +185,7 @@ export default function Stock() {
             )}
             <div>
               <Label>Expiry (optional)</Label>
-              <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} />
+              <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} min={new Date().toISOString().split("T")[0]} />
             </div>
             <Button className="w-full" disabled={!form.productId || !form.quantity || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>

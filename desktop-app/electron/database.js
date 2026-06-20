@@ -38,7 +38,7 @@ function generateToken() {
 const WORDS = require("./wordlist");
 
 function generateRecoveryPhrase() {
-  const bytes = crypto.randomBytes(16);
+  const bytes = crypto.randomBytes(24);
   const indices = [];
   for (let i = 0; i < 12; i++) {
     const idx = (bytes[i * 2] << 8 | bytes[i * 2 + 1]) % WORDS.length;
