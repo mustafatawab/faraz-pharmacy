@@ -76,16 +76,32 @@ export default function POS() {
   const handleBarcodeSubmit = async (value: string) => {
     const product = await api.products.getByBarcode(value);
     if (product) {
+      if (product.stock_qty === 0) {
+        setError(`${product.name} is out of stock`);
+        return;
+      }
       cart.addItem(product as unknown as Product);
     } else {
       const found = displayProducts.find(
         (p: Product) => p.barcode === value || p.name.toLowerCase() === value.toLowerCase()
       );
-      if (found) cart.addItem(found);
+      if (found) {
+        if (found.stock_qty === 0) {
+          setError(`${found.name} is out of stock`);
+          return;
+        }
+        cart.addItem(found);
+      }
     }
   };
 
-  const handleAddProduct = (product: Product) => cart.addItem(product);
+  const handleAddProduct = (product: Product) => {
+    if (product.stock_qty === 0) {
+      setError(`${product.name} is out of stock`);
+      return;
+    }
+    cart.addItem(product);
+  };
 
   const [pendingPrintData, setPendingPrintData] = useState<unknown>(null);
 

@@ -19,13 +19,13 @@ export default function Distributors() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", contact: "", phone: "", address: "", companyId: "" });
+  const [form, setForm] = useState({ name: "", phone: "", companyId: "" });
 
   const { data: distributors = [], isLoading } = useQuery({ queryKey: ["distributors"], queryFn: api.distributors.list });
   const { data: companies = [] } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
 
   const filtered = distributors.filter((d: Distributor) =>
-    !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.contact.toLowerCase().includes(search.toLowerCase())
+    !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.phone.includes(search)
   );
 
   const createMutation = useMutation({
@@ -34,7 +34,7 @@ export default function Distributors() {
       toast.success("Distributor created");
       queryClient.invalidateQueries({ queryKey: ["distributors"] });
       setOpen(false);
-      setForm({ name: "", contact: "", phone: "", address: "", companyId: "" });
+      setForm({ name: "", phone: "", companyId: "" });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -46,7 +46,7 @@ export default function Distributors() {
       queryClient.invalidateQueries({ queryKey: ["distributors"] });
       setOpen(false);
       setEditingId(null);
-      setForm({ name: "", contact: "", phone: "", address: "", companyId: "" });
+      setForm({ name: "", phone: "", companyId: "" });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -62,13 +62,13 @@ export default function Distributors() {
 
   function openAdd() {
     setEditingId(null);
-    setForm({ name: "", contact: "", phone: "", address: "", companyId: "" });
+    setForm({ name: "", phone: "", companyId: "" });
     setOpen(true);
   }
 
   function openEdit(d: Distributor) {
     setEditingId(d.id);
-    setForm({ name: d.name, contact: d.contact, phone: d.phone, address: d.address, companyId: d.company_id || "" });
+    setForm({ name: d.name, phone: d.phone, companyId: d.company_id || "" });
     setOpen(true);
   }
 
@@ -80,10 +80,10 @@ export default function Distributors() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
           <Input placeholder="Search distributors..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Button variant="outline" size="sm" onClick={() => downloadCSV(`distributors_${new Date().toISOString().split("T")[0]}.csv`, ["Name","Contact","Phone","Address","Company","Products"], filtered.map((d: Distributor) => [d.name, d.contact, d.phone, d.address, d.company_name||"", d.product_count||0]))}>
+        <Button variant="outline" size="sm" onClick={() => downloadCSV(`distributors_${new Date().toISOString().split("T")[0]}.csv`, ["Name","Contact Number","Company","Products"], filtered.map((d: Distributor) => [d.name, d.phone, d.company_name||"", d.product_count||0]))}>
           <Download className="h-4 w-4 mr-1" /> CSV
         </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadPDF(`distributors_${new Date().toISOString().split("T")[0]}.pdf`, "Distributors List", ["Name","Contact","Phone","Address","Company","Products"], filtered.map((d: Distributor) => [d.name, d.contact, d.phone, d.address, d.company_name||"", d.product_count||0]))}>
+        <Button variant="outline" size="sm" onClick={() => downloadPDF(`distributors_${new Date().toISOString().split("T")[0]}.pdf`, "Distributors List", ["Name","Contact Number","Company","Products"], filtered.map((d: Distributor) => [d.name, d.phone, d.company_name||"", d.product_count||0]))}>
           <Download className="h-4 w-4 mr-1" /> PDF
         </Button>
       </div>
@@ -103,7 +103,6 @@ export default function Distributors() {
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-medium text-text-primary truncate">{dist.name}</h3>
-                      <p className="text-xs text-text-secondary mt-0.5">{dist.contact}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{dist.phone}</div>
                         {dist.company_name && <div className="flex items-center gap-1 text-xs text-text-secondary"><Building2 className="h-3 w-3" />{dist.company_name}</div>}
@@ -138,7 +137,7 @@ export default function Distributors() {
                 options={companies.map((c: Company) => ({ value: c.id, label: c.name }))}
                 value={form.companyId}
                 onChange={(v) => setForm({ ...form, companyId: v })}
-                placeholder="Select company (optional)"
+                placeholder="Select company"
               />
             </div>
             <div>
@@ -146,20 +145,10 @@ export default function Distributors() {
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
-              <Label>Contact Person</Label>
-              <Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+              <Label>Contact Number</Label>
+              <Input inputMode="numeric" pattern="[0-9]*" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 11) })} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Phone</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-              </div>
-              <div>
-                <Label>Address</Label>
-                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-            </div>
-            <Button className="w-full" disabled={!form.name || createMutation.isPending || updateMutation.isPending}
+            <Button className="w-full" disabled={!form.name || form.phone.length !== 11 || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Distributor" : "Add Distributor"}
             </Button>

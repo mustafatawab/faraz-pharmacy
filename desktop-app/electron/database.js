@@ -156,6 +156,7 @@ function initializeDatabase() {
   try { db.exec("ALTER TABLE products ADD COLUMN markup_percent REAL NOT NULL DEFAULT 20"); } catch {}
   try { db.exec("ALTER TABLE stock_purchases ADD COLUMN company_id TEXT REFERENCES companies(id)"); } catch {}
   try { db.exec("ALTER TABLE stock_purchases ADD COLUMN invoice_number TEXT NOT NULL DEFAULT ''"); } catch {}
+  try { db.exec("ALTER TABLE stock_purchases ADD COLUMN sale_price REAL NOT NULL DEFAULT 0"); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS recovery_keys (
