@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const { getDatabase, getDbPath, restoreDatabase } = require("./database");
 const { getBackupsDir } = require("./config");
 const crypto = require("crypto");
@@ -7,11 +8,13 @@ const fs = require("fs");
 const path = require("path");
 const id = () => crypto.randomUUID();
 
+
 let serverInstance;
 
 function startServer(port) {
   const app = express();
   app.use(cors());
+  app.use(helmet());
   app.use(express.json());
 
   const db = () => getDatabase();
@@ -138,12 +141,12 @@ function startServer(port) {
   app.post("/api/stock", (req, res) => {
     const d = db(); const p = req.body; const i=id();
     const product = d.prepare("SELECT purchase_price, sale_price FROM products WHERE id=?").get(p.productId);
-    const price = p.purchasePrice ?? product?.purchase_price ?? 0;
-    const salePrice = p.salePrice > 0 ? p.salePrice : product?.sale_price ?? 0;
+    const price = product?.purchase_price ?? 0;
+    const salePrice = product?.sale_price ?? 0;
     const tv = p.quantity * price;
     d.transaction(() => {
       d.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,company_id,invoice_number,quantity,purchase_price,sale_price,expiry,total_value) VALUES (?,?,?,?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.companyId||null, p.invoiceNumber||"", p.quantity, price, salePrice, p.expiry||null, tv);
-      d.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, sale_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(p.quantity, price, salePrice, p.expiry||null, p.productId);
+      d.prepare("UPDATE products SET stock_qty=stock_qty+?, expiry=COALESCE(?,expiry) WHERE id=?").run(p.quantity, p.expiry||null, p.productId);
     })();
     res.json(d.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id WHERE sp.id=?").get(i));
   });
@@ -152,12 +155,10 @@ function startServer(port) {
     const old = d.prepare("SELECT * FROM stock_purchases WHERE id=?").get(req.params.id);
     if (!old) return res.status(404).json({ error: "Not found" });
     const qtyDiff = p.quantity - old.quantity;
-    const price = p.purchasePrice ?? old.purchase_price;
-    const salePrice = p.salePrice > 0 ? p.salePrice : (old.sale_price ?? 0);
-    const tv = p.quantity * price;
+    const tv = p.quantity * old.purchase_price;
     d.transaction(() => {
-      d.prepare("UPDATE stock_purchases SET quantity=?, purchase_price=?, sale_price=?, expiry=?, total_value=?, company_id=?, invoice_number=?, distributor_id=? WHERE id=?").run(p.quantity, price, salePrice, p.expiry||null, tv, p.companyId||null, p.invoiceNumber||"", p.distributorId||null, req.params.id);
-      d.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, sale_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(qtyDiff, price, salePrice, p.expiry||null, old.product_id);
+      d.prepare("UPDATE stock_purchases SET quantity=?, expiry=?, total_value=?, company_id=?, invoice_number=?, distributor_id=? WHERE id=?").run(p.quantity, p.expiry||null, tv, p.companyId||null, p.invoiceNumber||"", p.distributorId||null, req.params.id);
+      d.prepare("UPDATE products SET stock_qty=stock_qty+?, expiry=COALESCE(?,expiry) WHERE id=?").run(qtyDiff, p.expiry||null, old.product_id);
     })();
     res.json(d.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id WHERE sp.id=?").get(req.params.id));
   });

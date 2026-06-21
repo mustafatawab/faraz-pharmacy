@@ -18,7 +18,7 @@ import { PRODUCT_CATEGORIES } from "@/types";
 
 interface CsvRow {
   rowNum: number; barcode: string; name: string; category: string; location: string;
-  purchasePrice: string; expiry: string; error?: string;
+  purchasePrice: string; salePrice: string; expiry: string; error?: string;
 }
 
 const HEADER_LOOKUP: Record<string, string> = {
@@ -26,18 +26,19 @@ const HEADER_LOOKUP: Record<string, string> = {
   "name": "name", "product name": "name", "medicine": "name", "medicine name": "name", "item": "name", "item name": "name",
   "purchased price": "purchasePrice", "purchasedprice": "purchasePrice", "purchase price": "purchasePrice",
   "purchaseprice": "purchasePrice", "price": "purchasePrice", "purchase": "purchasePrice",
+  "sale price": "salePrice", "saleprice": "salePrice", "selling price": "salePrice", "retail price": "salePrice", "retail": "salePrice",
   "category": "category", "location": "location",
   "expiry date": "expiry", "expiry time": "expiry", "expiry": "expiry",
 };
 
 interface ProductForm {
   barcode: string; name: string; category: string; location: string;
-  purchasePrice: string; expiry: string;
+  purchasePrice: string; salePrice: string; expiry: string;
 }
 
 const emptyForm = (): ProductForm => ({
   barcode: generateBarcode(), name: "", category: "", location: "",
-  purchasePrice: "", expiry: "",
+  purchasePrice: "", salePrice: "", expiry: "",
 });
 
 export default function Products() {
@@ -68,6 +69,7 @@ export default function Products() {
     mutationFn: () => api.products.create({
       barcode: form.barcode, name: form.name, category: form.category,
       location: form.location, purchasePrice: Number(form.purchasePrice),
+      salePrice: Number(form.salePrice) || 0,
       expiry: form.expiry || undefined,
     }),
     onSuccess: (product) => {
@@ -85,6 +87,7 @@ export default function Products() {
     mutationFn: () => api.products.update(editingId!, {
       barcode: form.barcode, name: form.name, category: form.category,
       location: form.location, purchasePrice: Number(form.purchasePrice),
+      salePrice: Number(form.salePrice) || 0,
       expiry: form.expiry || undefined,
     }),
     onSuccess: () => {
@@ -131,6 +134,7 @@ export default function Products() {
     setForm({
       barcode: product.barcode, name: product.name, category: product.category,
       location: product.location, purchasePrice: String(product.purchase_price),
+      salePrice: String(product.sale_price),
       expiry: product.expiry || "",
     });
     setOpen(true);
@@ -161,9 +165,9 @@ export default function Products() {
       }
     }
 
-    if (!headerMap.has("barcode")) return { errors: ["Missing required column: barcode (or bar code, code)"], rows: [] };
-    if (!headerMap.has("name")) return { errors: ["Missing required column: name (or product name, medicine, item)"], rows: [] };
-    if (!headerMap.has("purchasePrice")) return { errors: ["Missing required column: purchase price (or price, purchase)"], rows: [] };
+    if (!hasHeader(headerMap, "barcode")) return { errors: ["Missing required column: barcode (or bar code, code)"], rows: [] };
+    if (!hasHeader(headerMap, "name")) return { errors: ["Missing required column: name (or product name, medicine, item)"], rows: [] };
+    if (!hasHeader(headerMap, "purchasePrice")) return { errors: ["Missing required column: purchase price (or price, purchase)"], rows: [] };
 
     const errors: string[] = [];
     if (unmatchedHeaders.length > 0) {
@@ -178,9 +182,10 @@ export default function Products() {
         barcode: cols[findIndex(headerMap, "barcode")]?.trim() || "",
         name: cols[findIndex(headerMap, "name")]?.trim() || "",
         purchasePrice: cols[findIndex(headerMap, "purchasePrice")]?.trim() || "",
-        category: headerMap.has("category") ? cols[findIndex(headerMap, "category")]?.trim() || "" : "",
-        location: headerMap.has("location") ? cols[findIndex(headerMap, "location")]?.trim() || "" : "",
-        expiry: headerMap.has("expiry") ? cols[findIndex(headerMap, "expiry")]?.trim() || "" : "",
+        salePrice: hasHeader(headerMap, "salePrice") ? cols[findIndex(headerMap, "salePrice")]?.trim() || "" : "",
+        category: hasHeader(headerMap, "category") ? cols[findIndex(headerMap, "category")]?.trim() || "" : "",
+        location: hasHeader(headerMap, "location") ? cols[findIndex(headerMap, "location")]?.trim() || "" : "",
+        expiry: hasHeader(headerMap, "expiry") ? cols[findIndex(headerMap, "expiry")]?.trim() || "" : "",
       };
       const rowErrors: string[] = [];
       if (!row.barcode) rowErrors.push("Missing barcode");
@@ -198,6 +203,10 @@ export default function Products() {
       if (val === key) return idx;
     }
     return -1;
+  }
+
+  function hasHeader(map: Map<number, string>, key: string): boolean {
+    return findIndex(map, key) !== -1;
   }
 
   function processFile(file: File) {
@@ -253,10 +262,10 @@ export default function Products() {
   }
 
   function downloadSampleCsv() {
-    const sample = `Barcode,Product Name,Purchase Price,Category,Location,Expiry
-123456,Panadol 500mg,80,Tablets,Shelf A1,2027-12-31
-123457,Brufen 400mg,120,Capsules,Shelf B2,2028-06-15
-123458,Augmentin 1g,250,Tablets,Shelf A3,2027-09-01`;
+    const sample = `Barcode,Product Name,Purchase Price,Sale Price,Category,Location,Expiry
+123456,Panadol 500mg,80,100,Tablets,Shelf A1,2027-12-31
+123457,Brufen 400mg,120,150,Capsules,Shelf B2,2028-06-15
+123458,Augmentin 1g,250,300,Tablets,Shelf A3,2027-09-01`;
     const blob = new Blob(["\uFEFF" + sample], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -284,6 +293,7 @@ export default function Products() {
           category: row.category || undefined,
           location: row.location || undefined,
           purchasePrice: Number(row.purchasePrice),
+          salePrice: Number(row.salePrice) || 0,
           expiry: row.expiry || undefined,
         });
         success++;
@@ -407,7 +417,7 @@ export default function Products() {
               <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); downloadSampleCsv(); }}>
                 <Download className="h-4 w-4 mr-1" /> Download Sample CSV
               </Button>
-              <p className="text-[10px] text-text-secondary/60">Supports: barcode, name, purchase price, category, location, expiry</p>
+              <p className="text-[10px] text-text-secondary/60">Supports: barcode, name, purchase price, sale price, category, location, expiry</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -431,7 +441,8 @@ export default function Products() {
                       <th className="text-left p-2 font-medium">#</th>
                       <th className="text-left p-2 font-medium">Barcode</th>
                       <th className="text-left p-2 font-medium">Name</th>
-                      <th className="text-left p-2 font-medium">Price</th>
+                      <th className="text-left p-2 font-medium">Purchase</th>
+                      <th className="text-left p-2 font-medium">Sale</th>
                       <th className="text-left p-2 font-medium">Category</th>
                       <th className="text-left p-2 font-medium">Status</th>
                     </tr>
@@ -443,6 +454,7 @@ export default function Products() {
                         <td className="p-2 font-mono">{row.barcode}</td>
                         <td className="p-2">{row.name}</td>
                         <td className="p-2">{row.purchasePrice}</td>
+                        <td className="p-2">{row.salePrice || "\u2014"}</td>
                         <td className="p-2">{row.category || "\u2014"}</td>
                         <td className="p-2">
                           {row.error ? (
@@ -501,18 +513,16 @@ export default function Products() {
                 <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Shelf A1" />
               </div>
             </div>
-            <div>
-              <Label>Purchase Price</Label>
-              <Input type="number" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
-            </div>
-            {form.purchasePrice && (
-              <div className="text-sm text-text-secondary flex items-center gap-2">
-                <span>Sale Price (auto-calculated):</span>
-                <span className="font-mono font-medium text-accent">
-                  {formatCurrency(Math.round(Number(form.purchasePrice) * 1.2))}
-                </span>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Purchase Price</Label>
+                <Input type="number" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
               </div>
-            )}
+              <div>
+                <Label>Sale Price</Label>
+                <Input type="number" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} />
+              </div>
+            </div>
             <div>
               <Label>Expiry (optional)</Label>
               <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} min={new Date().toISOString().split("T")[0]} />

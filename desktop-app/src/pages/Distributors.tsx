@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Factory, Building2, Phone, Package, Search, Plus, Pencil, Trash2, Download } from "lucide-react";
+import { Factory, Building2, Phone, Package, Search, Plus, Pencil, Trash2, Download, LayoutGrid, List } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
+import DataTable from "@/components/shared/DataTable";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -20,6 +22,7 @@ export default function Distributors() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", companyId: "" });
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const { data: distributors = [], isLoading } = useQuery({ queryKey: ["distributors"], queryFn: api.distributors.list });
   const { data: companies = [] } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
@@ -86,7 +89,44 @@ export default function Distributors() {
         <Button variant="outline" size="sm" onClick={() => downloadPDF(`distributors_${new Date().toISOString().split("T")[0]}.pdf`, "Distributors List", ["Name","Contact Number","Company","Products"], filtered.map((d: Distributor) => [d.name, d.phone, d.company_name||"", d.product_count||0]))}>
           <Download className="h-4 w-4 mr-1" /> PDF
         </Button>
+        <div className="flex items-center border border-border rounded-lg overflow-hidden">
+          <button onClick={() => setViewMode("grid")} className={cn("p-2 transition-colors", viewMode === "grid" ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-2")}>
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button onClick={() => setViewMode("list")} className={cn("p-2 transition-colors", viewMode === "list" ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-2")}>
+            <List className="h-4 w-4" />
+          </button>
+        </div>
       </div>
+
+      {viewMode === "list" ? (
+        <div className="rounded-xl border border-border">
+          <DataTable
+            columns={[
+              { key: "name", header: "Name", cell: (d: Distributor) => <span className="font-medium text-text-primary">{d.name}</span> },
+              { key: "phone", header: "Contact", cell: (d: Distributor) => <span className="font-mono text-sm">{d.phone}</span> },
+              { key: "company_name", header: "Company", cell: (d: Distributor) => <span className="text-text-secondary">{d.company_name || "\u2014"}</span> },
+              { key: "product_count", header: "Products", cell: (d: Distributor) => <span className="font-mono">{d.product_count ?? 0}</span> },
+              {
+                key: "actions", header: "", cell: (d: Distributor) => (
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openEdit(d)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors" title="Edit">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => { if (confirm("Delete this distributor?")) deleteMutation.mutate(d.id); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+            data={filtered}
+            loading={isLoading}
+            keyExtractor={(d: Distributor) => d.id}
+            emptyMessage="No distributors found"
+          />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
@@ -103,10 +143,10 @@ export default function Distributors() {
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-medium text-text-primary truncate">{dist.name}</h3>
-                      <div className="flex items-center gap-3 mt-2">
-                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{dist.phone}</div>
-                        {dist.company_name && <div className="flex items-center gap-1 text-xs text-text-secondary"><Building2 className="h-3 w-3" />{dist.company_name}</div>}
-                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3" />{dist.product_count ?? 0} products</div>
+                      <div className="space-y-1 mt-2">
+                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3 shrink-0" />{dist.phone}</div>
+                        {dist.company_name && <div className="flex items-center gap-1 text-xs text-text-secondary"><Building2 className="h-3 w-3 shrink-0" />{dist.company_name}</div>}
+                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3 shrink-0" />{dist.product_count ?? 0} products</div>
                       </div>
                     </div>
                   </div>
@@ -123,7 +163,7 @@ export default function Distributors() {
             </Card>
           ))
         )}
-      </div>
+      </div>)}
 
       <Dialog open={open} onOpenChange={(v) => { if (!v) { setEditingId(null); } setOpen(v); }}>
         <DialogContent>

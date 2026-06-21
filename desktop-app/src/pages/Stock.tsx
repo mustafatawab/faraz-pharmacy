@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Package, Pencil, Building2, Factory, FileText } from "lucide-react";
+import { Plus, Package, Pencil } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
 import StatCard from "@/components/shared/StatCard";
@@ -20,17 +20,13 @@ export default function Stock() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     productId: "", distributorId: "", companyId: "",
-    invoiceNumber: "", purchasePrice: "", salePrice: "", quantity: "", expiry: "",
+    invoiceNumber: "", quantity: "", expiry: "",
   });
 
   const { data: stockEntries = [], isLoading } = useQuery({ queryKey: ["stock"], queryFn: api.stock.list });
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: api.products.list });
   const { data: distributors = [] } = useQuery({ queryKey: ["distributors"], queryFn: api.distributors.list });
   const { data: companies = [] } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
-
-  const qty = Number(form.quantity) || 0;
-  const price = Number(form.purchasePrice) || 0;
-  const autoTotal = qty * price;
 
   const totalValue = stockEntries.reduce((s: number, i: StockPurchase) => s + i.total_value, 0);
 
@@ -40,8 +36,6 @@ export default function Stock() {
       distributorId: form.distributorId || undefined,
       companyId: form.companyId || undefined,
       invoiceNumber: form.invoiceNumber,
-      purchasePrice: Number(form.purchasePrice) || undefined,
-      salePrice: Number(form.salePrice) || undefined,
       quantity: Number(form.quantity),
       expiry: form.expiry || undefined,
     }),
@@ -49,7 +43,7 @@ export default function Stock() {
       queryClient.invalidateQueries({ queryKey: ["stock"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setOpen(false);
-      setForm({ productId: "", distributorId: "", companyId: "", invoiceNumber: "", purchasePrice: "", salePrice: "", quantity: "", expiry: "" });
+      setForm({ productId: "", distributorId: "", companyId: "", invoiceNumber: "", quantity: "", expiry: "" });
       toast.success("Stock purchase recorded");
     },
     onError: (err) => {
@@ -63,8 +57,6 @@ export default function Stock() {
       distributorId: form.distributorId || undefined,
       companyId: form.companyId || undefined,
       invoiceNumber: form.invoiceNumber,
-      purchasePrice: Number(form.purchasePrice) || undefined,
-      salePrice: Number(form.salePrice) || undefined,
       quantity: Number(form.quantity),
       expiry: form.expiry || undefined,
     }),
@@ -73,7 +65,7 @@ export default function Stock() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setOpen(false);
       setEditingId(null);
-      setForm({ productId: "", distributorId: "", companyId: "", invoiceNumber: "", purchasePrice: "", salePrice: "", quantity: "", expiry: "" });
+      setForm({ productId: "", distributorId: "", companyId: "", invoiceNumber: "", quantity: "", expiry: "" });
       toast.success("Stock purchase updated");
     },
     onError: (err) => {
@@ -83,7 +75,7 @@ export default function Stock() {
 
   function openAdd() {
     setEditingId(null);
-    setForm({ productId: "", distributorId: "", companyId: "", invoiceNumber: "", purchasePrice: "", salePrice: "", quantity: "", expiry: "" });
+    setForm({ productId: "", distributorId: "", companyId: "", invoiceNumber: "", quantity: "", expiry: "" });
     setOpen(true);
   }
 
@@ -94,21 +86,10 @@ export default function Stock() {
       distributorId: entry.distributor_id || "",
       companyId: entry.company_id || "",
       invoiceNumber: entry.invoice_number || "",
-      purchasePrice: String(entry.purchase_price),
-      salePrice: String(entry.sale_price || ""),
       quantity: String(entry.quantity),
       expiry: entry.expiry || "",
     });
     setOpen(true);
-  }
-
-  function handleProductChange(productId: string) {
-    const product = products.find((p: Product) => p.id === productId);
-    setForm({
-      ...form,
-      productId,
-      salePrice: product ? String(product.sale_price) : "",
-    });
   }
 
   const columns = [
@@ -151,7 +132,7 @@ export default function Stock() {
                 <SearchableSelect
                   options={products.map((p: Product) => ({ value: p.id, label: `${p.name} (${p.barcode})` }))}
                   value={form.productId}
-                  onChange={handleProductChange}
+                  onChange={(v) => setForm({ ...form, productId: v })}
                   placeholder="Select product"
                   disabled={!!editingId}
                 />
@@ -180,28 +161,10 @@ export default function Stock() {
               <Label>Invoice Number</Label>
               <Input value={form.invoiceNumber} onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })} placeholder="e.g. INV-001" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Quantity</Label>
-                <Input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
-              </div>
-              <div>
-                <Label>Sale Price (per unit)</Label>
-                <Input type="number" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} />
-              </div>
+            <div>
+              <Label>Quantity</Label>
+              <Input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Purchase Price (per unit)</Label>
-                <Input type="number" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
-              </div>
-            </div>
-            {form.quantity && form.purchasePrice && (
-              <div className="text-sm text-text-secondary flex items-center gap-2">
-                <span>Total Amount:</span>
-                <span className="font-mono font-medium text-accent">{formatCurrency(autoTotal)}</span>
-              </div>
-            )}
             <div>
               <Label>Expiry (optional)</Label>
               <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} min={new Date().toISOString().split("T")[0]} />

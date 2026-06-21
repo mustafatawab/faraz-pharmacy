@@ -101,10 +101,10 @@ export default function Companies() {
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-medium text-text-primary truncate">{comp.name}</h3>
-                      <div className="flex items-center gap-3 mt-2">
-                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{comp.phone}</div>
-                        {comp.second_number && <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{comp.second_number}</div>}
-                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3" />{comp.product_count ?? 0} products</div>
+                      <div className="space-y-1 mt-2">
+                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3 shrink-0" />{comp.phone}</div>
+                        {comp.second_number && <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3 shrink-0" />{comp.second_number}</div>}
+                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3 shrink-0" />{comp.product_count ?? 0} products</div>
                       </div>
                     </div>
                   </div>
