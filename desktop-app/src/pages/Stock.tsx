@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Package, Pencil } from "lucide-react";
+import { Plus, Pencil, Eye, EyeOff } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
-import StatCard from "@/components/shared/StatCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -18,6 +18,7 @@ export default function Stock() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showValue, setShowValue] = useState(true);
   const [form, setForm] = useState({
     productId: "", distributorId: "", companyId: "",
     invoiceNumber: "", quantity: "", expiry: "",
@@ -118,7 +119,21 @@ export default function Stock() {
     <div>
       <PageHeader title="Stock / Purchases" description="Track inventory purchases and stock levels" action={{ label: "New Purchase", onClick: openAdd }} />
       <div className="mb-6">
-        <StatCard title="Total Stock Value" value={formatCurrency(totalValue)} icon={<Package className="h-5 w-5" />} />
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-text-secondary">Total Stock Value</p>
+                <p className="text-2xl font-bold text-text-primary">
+                  {showValue ? formatCurrency(totalValue) : "********"}
+                </p>
+              </div>
+              <button onClick={() => setShowValue(!showValue)} className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center text-accent hover:bg-accent/20 transition-colors" title={showValue ? "Hide value" : "Show value"}>
+                {showValue ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
       <div className="rounded-xl border border-border overflow-x-auto">
         <DataTable columns={columns} data={stockEntries} loading={isLoading} keyExtractor={(s: StockPurchase) => s.id} />
