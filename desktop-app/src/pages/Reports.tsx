@@ -78,7 +78,8 @@ export default function Reports() {
   const totalOutstanding = filteredArrears.filter((a: Arrear) => a.status === "pending").reduce((sum: number, a: Arrear) => sum + a.balance_due, 0);
   const pendingArrears = filteredArrears.filter((a: Arrear) => a.status === "pending");
 
-  const weekRevenue = dashboardStats?.weekRevenue ?? [];
+  const [chartPeriod, setChartPeriod] = useState<"week" | "month">("week");
+  const chartData = chartPeriod === "week" ? (dashboardStats?.weekRevenue ?? []) : (dashboardStats?.monthRevenue ?? []);
 
   const lowStockColumns = [
     { key: "name", header: "Product", cell: (p: Product) => <span className="text-text-primary">{p.name}</span> },
@@ -161,8 +162,12 @@ export default function Reports() {
           </div>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base font-semibold">Revenue Trend (7 days)</CardTitle>
+              <CardTitle className="text-base font-semibold">Revenue Trend ({chartPeriod === "week" ? "7 days" : "30 days"})</CardTitle>
               <div className="flex items-center gap-2">
+                <div className="flex rounded-lg border border-border overflow-hidden">
+                  <button onClick={() => setChartPeriod("week")} className={`px-3 py-1.5 text-xs font-medium transition-colors ${chartPeriod === "week" ? "bg-accent text-accent-foreground" : "text-text-secondary hover:text-text-primary"}`}>Week</button>
+                  <button onClick={() => setChartPeriod("month")} className={`px-3 py-1.5 text-xs font-medium transition-colors ${chartPeriod === "month" ? "bg-accent text-accent-foreground" : "text-text-secondary hover:text-text-primary"}`}>Month</button>
+                </div>
                 <Button variant="outline" size="sm" onClick={() => downloadCSV(`sales_report_${dateRange.from}_${dateRange.to}.csv`, ["Date","Customer","Items","Subtotal","Discount","Total","Paid","Change","Status"], filteredSales.map((s: Sale) => [s.created_at, s.customer_name||"Walk-in", s.items?.length||0, s.subtotal, s.discount, s.total, s.amount_paid, s.change, s.status]))}>
                   <Download className="h-4 w-4 mr-1" />CSV
                 </Button>
@@ -172,7 +177,7 @@ export default function Reports() {
               </div>
             </CardHeader>
             <CardContent>
-              <RevenueChart />
+              <RevenueChart data={chartData} period={chartPeriod} />
             </CardContent>
           </Card>
         </TabsContent>

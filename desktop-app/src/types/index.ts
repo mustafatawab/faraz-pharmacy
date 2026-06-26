@@ -234,5 +234,6 @@ export interface DashboardStats {
   lowStockCount: number;
   expiringSoonCount: number;
   weekRevenue: { day: string; revenue: number }[];
+  monthRevenue: { day: string; revenue: number }[];
   topProducts: { name: string; value: number }[];
 }

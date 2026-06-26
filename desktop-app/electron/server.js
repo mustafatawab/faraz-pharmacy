@@ -143,13 +143,19 @@ function startServer(port) {
     if (!a) return res.status(404).json({ error: "Not found" });
     const np = a.amount_paid + req.body.amount; const nb = a.total_bill - np;
     d.prepare("UPDATE arrears SET amount_paid=?, balance_due=?, status=? WHERE id=?").run(np, Math.max(0, nb), nb<=0?"settled":"pending", req.params.id);
+    if (nb <= 0 && a.sale_id) {
+      d.prepare("UPDATE sales SET status='paid' WHERE id=?").run(a.sale_id);
+    }
     res.json(d.prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(req.params.id));
   });
   app.post("/api/arrears/:id/settle", (req, res) => {
-    const a = db().prepare("SELECT * FROM arrears WHERE id=?").get(req.params.id);
+    const d = db(); const a = d.prepare("SELECT * FROM arrears WHERE id=?").get(req.params.id);
     if (!a) return res.status(404).json({ error: "Not found" });
-    db().prepare("UPDATE arrears SET amount_paid=total_bill, balance_due=0, status='settled' WHERE id=?").run(req.params.id);
-    res.json(db().prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(req.params.id));
+    d.prepare("UPDATE arrears SET amount_paid=total_bill, balance_due=0, status='settled' WHERE id=?").run(req.params.id);
+    if (a.sale_id) {
+      d.prepare("UPDATE sales SET status='paid' WHERE id=?").run(a.sale_id);
+    }
+    res.json(d.prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(req.params.id));
   });
   app.delete("/api/arrears/:id", (req, res) => { db().prepare("DELETE FROM arrears WHERE id=?").run(req.params.id); res.json({ success: true }); });
 
@@ -264,6 +270,7 @@ function startServer(port) {
       lowStockCount: d.prepare("SELECT COUNT(*) as c FROM products WHERE stock_qty<=5").get().c,
       expiringSoonCount: d.prepare("SELECT COUNT(*) as c FROM products WHERE expiry IS NOT NULL AND date(expiry) BETWEEN date('now') AND date('now','+30 days')").get().c,
       weekRevenue: d.prepare("SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue FROM sales WHERE created_at>=datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day").all(),
+      monthRevenue: d.prepare("SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue FROM sales WHERE created_at>=datetime('now','-30 days') GROUP BY date(created_at) ORDER BY day").all(),
       topProducts: d.prepare("SELECT si.product_name as name, SUM(si.quantity) as value FROM sale_items si GROUP BY si.product_name ORDER BY value DESC LIMIT 5").all(),
     });
   });

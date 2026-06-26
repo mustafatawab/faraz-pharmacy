@@ -196,14 +196,21 @@ function registerHandlers() {
     const np = a.amount_paid + amt;
     const nb = a.total_bill - np;
     db.prepare("UPDATE arrears SET amount_paid=?, balance_due=?, status=? WHERE id=?").run(np, Math.max(0, nb), nb<=0?"settled":"pending", aid);
+    if (nb <= 0 && a.sale_id) {
+      db.prepare("UPDATE sales SET status='paid' WHERE id=?").run(a.sale_id);
+    }
     return db.prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(aid);
   });
   ipcMain.handle("arrears:delete", (_, id) => { getDatabase().prepare("DELETE FROM arrears WHERE id=?").run(id); return { success: true }; });
   ipcMain.handle("arrears:settle", (_, id) => {
-    const a = getDatabase().prepare("SELECT * FROM arrears WHERE id=?").get(id);
+    const db = getDatabase();
+    const a = db.prepare("SELECT * FROM arrears WHERE id=?").get(id);
     if (!a) return { error: "Not found" };
-    getDatabase().prepare("UPDATE arrears SET amount_paid=total_bill, balance_due=0, status='settled' WHERE id=?").run(id);
-    return getDatabase().prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(id);
+    db.prepare("UPDATE arrears SET amount_paid=total_bill, balance_due=0, status='settled' WHERE id=?").run(id);
+    if (a.sale_id) {
+      db.prepare("UPDATE sales SET status='paid' WHERE id=?").run(a.sale_id);
+    }
+    return db.prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(id);
   });
 
   // Stock
@@ -281,6 +288,7 @@ function registerHandlers() {
       lowStockCount: db.prepare("SELECT COUNT(*) as c FROM products WHERE stock_qty<=5").get().c,
       expiringSoonCount: db.prepare("SELECT COUNT(*) as c FROM products WHERE expiry IS NOT NULL AND date(expiry) BETWEEN date('now') AND date('now','+30 days')").get().c,
       weekRevenue: db.prepare("SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue FROM sales WHERE created_at>=datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day").all(),
+      monthRevenue: db.prepare("SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue FROM sales WHERE created_at>=datetime('now','-30 days') GROUP BY date(created_at) ORDER BY day").all(),
       topProducts: db.prepare("SELECT si.product_name as name, SUM(si.quantity) as value FROM sale_items si GROUP BY si.product_name ORDER BY value DESC LIMIT 5").all(),
     };
   });
