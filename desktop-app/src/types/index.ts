@@ -126,6 +126,7 @@ export interface StockPurchase {
   invoice_number: string;
   quantity: number;
   purchase_price: number;
+  sale_price: number;
   expiry?: string;
   total_value: number;
   created_at: string;
@@ -137,6 +138,7 @@ export interface StockInput {
   companyId?: string;
   invoiceNumber?: string;
   purchasePrice?: number;
+  salePrice?: number;
   quantity: number;
   expiry?: string;
 }
@@ -144,9 +146,7 @@ export interface StockInput {
 export interface Distributor {
   id: string;
   name: string;
-  contact: string;
   phone: string;
-  address: string;
   company_id?: string;
   company_name?: string;
   created_at: string;
@@ -155,16 +155,13 @@ export interface Distributor {
 
 export interface DistributorInput {
   name: string;
-  contact?: string;
-  phone?: string;
-  address?: string;
+  phone: string;
   companyId?: string;
 }
 
 export interface Company {
   id: string;
   name: string;
-  contact: string;
   phone: string;
   address: string;
   second_number: string;
@@ -174,8 +171,7 @@ export interface Company {
 
 export interface CompanyInput {
   name: string;
-  contact?: string;
-  phone?: string;
+  phone: string;
   address?: string;
   second_number?: string;
 }
@@ -238,5 +234,6 @@ export interface DashboardStats {
   lowStockCount: number;
   expiringSoonCount: number;
   weekRevenue: { day: string; revenue: number }[];
+  monthRevenue: { day: string; revenue: number }[];
   topProducts: { name: string; value: number }[];
 }

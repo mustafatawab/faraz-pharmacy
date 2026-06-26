@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RevenueChart from "@/components/dashboard/RevenueChart";
 import StatusBadge from "@/components/shared/StatusBadge";
+import DataTable from "@/components/shared/DataTable";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
@@ -77,7 +78,48 @@ export default function Reports() {
   const totalOutstanding = filteredArrears.filter((a: Arrear) => a.status === "pending").reduce((sum: number, a: Arrear) => sum + a.balance_due, 0);
   const pendingArrears = filteredArrears.filter((a: Arrear) => a.status === "pending");
 
-  const weekRevenue = dashboardStats?.weekRevenue ?? [];
+  const [chartPeriod, setChartPeriod] = useState<"week" | "month">("week");
+  const chartData = chartPeriod === "week" ? (dashboardStats?.weekRevenue ?? []) : (dashboardStats?.monthRevenue ?? []);
+
+  const lowStockColumns = [
+    { key: "name", header: "Product", cell: (p: Product) => <span className="text-text-primary">{p.name}</span> },
+    { key: "stock_qty", header: "Stock", cell: (p: Product) => <span className="font-mono text-danger font-medium">{p.stock_qty}</span> },
+    { key: "threshold", header: "Threshold", cell: () => <span className="font-mono text-text-secondary">5</span> },
+  ];
+
+  const expiringColumns = [
+    { key: "name", header: "Product", cell: (p: Product) => <span className="text-text-primary">{p.name}</span> },
+    { key: "expiry", header: "Expiry", cell: (p: Product) => <span className="font-mono text-sm text-text-secondary">{formatDate(p.expiry)}</span> },
+    {
+      key: "days_left", header: "Days Left", cell: (p: Product) => {
+        const daysLeft = p.expiry ? Math.ceil((new Date(p.expiry).getTime() - Date.now()) / 86400000) : 0;
+        return <span className="font-mono text-danger font-medium">{daysLeft}</span>;
+      },
+    },
+  ];
+
+  const expenseColumns = [
+    { key: "title", header: "Title", cell: (e: Expense) => <span className="text-text-primary">{e.title}</span> },
+    { key: "category", header: "Category", cell: (e: Expense) => <span className="text-text-secondary">{e.category}</span> },
+    { key: "amount", header: "Amount", cell: (e: Expense) => <span className="font-mono font-medium text-danger">{formatCurrency(e.amount)}</span> },
+    { key: "date", header: "Date", cell: (e: Expense) => <span className="font-mono text-xs text-text-secondary">{formatDate(e.date)}</span> },
+  ];
+
+  const returnColumns = [
+    { key: "created_at", header: "Date", cell: (r: ReturnEntry) => <span className="font-mono text-xs text-text-secondary">{formatDateTime(r.created_at)}</span> },
+    { key: "sale_id", header: "Sale ID", cell: (r: ReturnEntry) => <span className="font-mono text-xs text-text-secondary">{r.sale_id.slice(0, 8)}</span> },
+    { key: "refund_amount", header: "Refund", cell: (r: ReturnEntry) => <span className="font-mono font-medium text-danger">{formatCurrency(r.refund_amount)}</span> },
+    { key: "reason", header: "Reason", cell: (r: ReturnEntry) => <span className="text-text-secondary">{r.reason}</span> },
+  ];
+
+  const arrearColumns = [
+    { key: "customer_name", header: "Customer", cell: (a: Arrear) => <span className="font-medium text-text-primary">{a.customer_name}</span> },
+    { key: "created_at", header: "Date", cell: (a: Arrear) => <span className="font-mono text-xs text-text-secondary">{formatDateTime(a.created_at)}</span> },
+    { key: "total_bill", header: "Total Bill", cell: (a: Arrear) => <span className="font-mono">{formatCurrency(a.total_bill)}</span> },
+    { key: "amount_paid", header: "Paid", cell: (a: Arrear) => <span className="font-mono">{formatCurrency(a.amount_paid)}</span> },
+    { key: "balance_due", header: "Balance", cell: (a: Arrear) => <span className="font-mono font-medium">{formatCurrency(a.balance_due)}</span> },
+    { key: "status", header: "Status", cell: (a: Arrear) => <StatusBadge status={a.status} />, className: "text-center" },
+  ];
 
   return (
     <div>
@@ -120,8 +162,12 @@ export default function Reports() {
           </div>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base font-semibold">Revenue Trend (7 days)</CardTitle>
+              <CardTitle className="text-base font-semibold">Revenue Trend ({chartPeriod === "week" ? "7 days" : "30 days"})</CardTitle>
               <div className="flex items-center gap-2">
+                <div className="flex rounded-lg border border-border overflow-hidden">
+                  <button onClick={() => setChartPeriod("week")} className={`px-3 py-1.5 text-xs font-medium transition-colors ${chartPeriod === "week" ? "bg-accent text-accent-foreground" : "text-text-secondary hover:text-text-primary"}`}>Week</button>
+                  <button onClick={() => setChartPeriod("month")} className={`px-3 py-1.5 text-xs font-medium transition-colors ${chartPeriod === "month" ? "bg-accent text-accent-foreground" : "text-text-secondary hover:text-text-primary"}`}>Month</button>
+                </div>
                 <Button variant="outline" size="sm" onClick={() => downloadCSV(`sales_report_${dateRange.from}_${dateRange.to}.csv`, ["Date","Customer","Items","Subtotal","Discount","Total","Paid","Change","Status"], filteredSales.map((s: Sale) => [s.created_at, s.customer_name||"Walk-in", s.items?.length||0, s.subtotal, s.discount, s.total, s.amount_paid, s.change, s.status]))}>
                   <Download className="h-4 w-4 mr-1" />CSV
                 </Button>
@@ -131,7 +177,7 @@ export default function Reports() {
               </div>
             </CardHeader>
             <CardContent>
-              <RevenueChart />
+              <RevenueChart data={chartData} period={chartPeriod} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -149,58 +195,13 @@ export default function Reports() {
             <Card>
               <CardHeader><CardTitle className="text-base font-semibold text-warning flex items-center gap-2"><Package className="h-4 w-4" />Low Stock Items (&le;5)</CardTitle></CardHeader>
               <CardContent className="p-0">
-                {lowStockProducts.length === 0 ? (
-                  <p className="text-center py-8 text-sm text-text-secondary">No low stock items</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Product</th>
-                        <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Stock</th>
-                        <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Threshold</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lowStockProducts.map((p: Product) => (
-                        <tr key={p.id} className="border-b border-border last:border-0">
-                          <td className="py-3 px-4 text-text-primary">{p.name}</td>
-                          <td className="py-3 px-4 text-right font-mono text-danger font-medium">{p.stock_qty}</td>
-                          <td className="py-3 px-4 text-right font-mono text-text-secondary">5</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                <DataTable columns={lowStockColumns} data={lowStockProducts} keyExtractor={(p: Product) => p.id} emptyMessage="No low stock items" />
               </CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle className="text-base font-semibold text-danger flex items-center gap-2"><Package className="h-4 w-4" />Expiring Items (30 days)</CardTitle></CardHeader>
               <CardContent className="p-0">
-                {expiringProducts.length === 0 ? (
-                  <p className="text-center py-8 text-sm text-text-secondary">No items expiring soon</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Product</th>
-                        <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Expiry</th>
-                        <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Days Left</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {expiringProducts.map((p: Product) => {
-                        const daysLeft = p.expiry ? Math.ceil((new Date(p.expiry).getTime() - Date.now()) / 86400000) : 0;
-                        return (
-                          <tr key={p.id} className="border-b border-border last:border-0">
-                            <td className="py-3 px-4 text-text-primary">{p.name}</td>
-                            <td className="py-3 px-4 font-mono text-sm text-text-secondary">{formatDate(p.expiry)}</td>
-                            <td className="py-3 px-4 text-right font-mono text-danger font-medium">{daysLeft}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
+                <DataTable columns={expiringColumns} data={expiringProducts} keyExtractor={(p: Product) => p.id} emptyMessage="No items expiring soon" />
               </CardContent>
             </Card>
           </div>
@@ -238,30 +239,7 @@ export default function Reports() {
           <Card>
             <CardHeader><CardTitle className="text-base font-semibold">Expense Breakdown</CardTitle></CardHeader>
             <CardContent className="p-0">
-              {filteredExpenses.length === 0 ? (
-                <p className="text-center py-8 text-sm text-text-secondary">No expenses in this period</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Title</th>
-                      <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Category</th>
-                      <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Amount</th>
-                      <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredExpenses.map((e: Expense) => (
-                      <tr key={e.id} className="border-b border-border hover:bg-surface-2/50">
-                        <td className="py-3 px-4 text-text-primary">{e.title}</td>
-                        <td className="py-3 px-4 text-text-secondary">{e.category}</td>
-                        <td className="py-3 px-4 text-right font-mono font-medium text-danger">{formatCurrency(e.amount)}</td>
-                        <td className="py-3 px-4 text-right font-mono text-xs text-text-secondary">{formatDate(e.date)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              <DataTable columns={expenseColumns} data={filteredExpenses} keyExtractor={(e: Expense) => e.id} emptyMessage="No expenses in this period" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -298,30 +276,7 @@ export default function Reports() {
           <Card>
             <CardHeader><CardTitle className="text-base font-semibold">Return History</CardTitle></CardHeader>
             <CardContent className="p-0">
-              {filteredReturns.length === 0 ? (
-                <p className="text-center py-8 text-sm text-text-secondary">No returns in this period</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Date</th>
-                      <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Sale ID</th>
-                      <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Refund</th>
-                      <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredReturns.map((r: ReturnEntry) => (
-                      <tr key={r.id} className="border-b border-border hover:bg-surface-2/50">
-                        <td className="py-3 px-4 font-mono text-xs text-text-secondary">{formatDateTime(r.created_at)}</td>
-                        <td className="py-3 px-4 font-mono text-xs text-text-secondary">{r.sale_id.slice(0, 8)}</td>
-                        <td className="py-3 px-4 text-right font-mono font-medium text-danger">{formatCurrency(r.refund_amount)}</td>
-                        <td className="py-3 px-4 text-text-secondary">{r.reason}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              <DataTable columns={returnColumns} data={filteredReturns} keyExtractor={(r: ReturnEntry) => r.id} emptyMessage="No returns in this period" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -367,34 +322,7 @@ export default function Reports() {
           <Card>
             <CardHeader><CardTitle className="text-base font-semibold">Arrear Details</CardTitle></CardHeader>
             <CardContent className="p-0">
-              {filteredArrears.length === 0 ? (
-                <p className="text-center py-8 text-sm text-text-secondary">No arrears in this period</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Customer</th>
-                      <th className="text-left py-3 px-4 text-xs font-medium text-text-secondary uppercase">Date</th>
-                      <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Total Bill</th>
-                      <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Paid</th>
-                      <th className="text-right py-3 px-4 text-xs font-medium text-text-secondary uppercase">Balance</th>
-                      <th className="text-center py-3 px-4 text-xs font-medium text-text-secondary uppercase">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredArrears.map((a: Arrear) => (
-                      <tr key={a.id} className="border-b border-border hover:bg-surface-2/50">
-                        <td className="py-3 px-4 font-medium text-text-primary">{a.customer_name}</td>
-                        <td className="py-3 px-4 font-mono text-xs text-text-secondary">{formatDateTime(a.created_at)}</td>
-                        <td className="py-3 px-4 text-right font-mono">{formatCurrency(a.total_bill)}</td>
-                        <td className="py-3 px-4 text-right font-mono">{formatCurrency(a.amount_paid)}</td>
-                        <td className="py-3 px-4 text-right font-mono font-medium">{formatCurrency(a.balance_due)}</td>
-                        <td className="py-3 px-4 text-center"><StatusBadge status={a.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              <DataTable columns={arrearColumns} data={filteredArrears} keyExtractor={(a: Arrear) => a.id} emptyMessage="No arrears in this period" />
             </CardContent>
           </Card>
         </TabsContent>

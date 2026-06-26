@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const { getDatabase, getDbPath, restoreDatabase } = require("./database");
 const { getBackupsDir } = require("./config");
 const crypto = require("crypto");
@@ -7,11 +8,13 @@ const fs = require("fs");
 const path = require("path");
 const id = () => crypto.randomUUID();
 
+
 let serverInstance;
 
 function startServer(port) {
   const app = express();
   app.use(cors());
+  app.use(helmet());
   app.use(express.json());
 
   const db = () => getDatabase();
@@ -103,7 +106,24 @@ function startServer(port) {
   });
   app.post("/api/customers", (req, res) => { const c = req.body; const i=id(); db().prepare("INSERT INTO customers (id,name,phone,address) VALUES (?,?,?,?)").run(i,c.name,c.phone,c.address||""); res.json(db().prepare("SELECT * FROM customers WHERE id=?").get(i)); });
   app.put("/api/customers/:id", (req, res) => { const c = req.body; db().prepare("UPDATE customers SET name=?, phone=?, address=? WHERE id=?").run(c.name, c.phone, c.address||"", req.params.id); res.json(db().prepare("SELECT * FROM customers WHERE id=?").get(req.params.id)); });
-  app.delete("/api/customers/:id", (req, res) => { db().prepare("DELETE FROM customers WHERE id=?").run(req.params.id); res.json({ success: true }); });
+  app.delete("/api/customers/:id", (req, res) => {
+    const d = db();
+    const id = req.params.id;
+    const force = req.query.force === "true";
+    const salesCount = d.prepare("SELECT COUNT(*) as c FROM sales WHERE customer_id=?").get(id).c;
+    const arrearsCount = d.prepare("SELECT COUNT(*) as c FROM arrears WHERE customer_id=?").get(id).c;
+    if ((salesCount > 0 || arrearsCount > 0) && !force) {
+      return res.status(400).json({ error: `Customer has ${salesCount} invoice(s) and ${arrearsCount} arrear(s). Use force delete to remove.`, salesCount, arrearsCount });
+    }
+    d.transaction(() => {
+      if (force) {
+        d.prepare("UPDATE sales SET customer_id=NULL WHERE customer_id=?").run(id);
+        d.prepare("DELETE FROM arrears WHERE customer_id=?").run(id);
+      }
+      d.prepare("DELETE FROM customers WHERE id=?").run(id);
+    })();
+    res.json({ success: true });
+  });
 
   // Arrears
   app.get("/api/arrears", (req, res) => {
@@ -123,13 +143,19 @@ function startServer(port) {
     if (!a) return res.status(404).json({ error: "Not found" });
     const np = a.amount_paid + req.body.amount; const nb = a.total_bill - np;
     d.prepare("UPDATE arrears SET amount_paid=?, balance_due=?, status=? WHERE id=?").run(np, Math.max(0, nb), nb<=0?"settled":"pending", req.params.id);
+    if (nb <= 0 && a.sale_id) {
+      d.prepare("UPDATE sales SET status='paid' WHERE id=?").run(a.sale_id);
+    }
     res.json(d.prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(req.params.id));
   });
   app.post("/api/arrears/:id/settle", (req, res) => {
-    const a = db().prepare("SELECT * FROM arrears WHERE id=?").get(req.params.id);
+    const d = db(); const a = d.prepare("SELECT * FROM arrears WHERE id=?").get(req.params.id);
     if (!a) return res.status(404).json({ error: "Not found" });
-    db().prepare("UPDATE arrears SET amount_paid=total_bill, balance_due=0, status='settled' WHERE id=?").run(req.params.id);
-    res.json(db().prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(req.params.id));
+    d.prepare("UPDATE arrears SET amount_paid=total_bill, balance_due=0, status='settled' WHERE id=?").run(req.params.id);
+    if (a.sale_id) {
+      d.prepare("UPDATE sales SET status='paid' WHERE id=?").run(a.sale_id);
+    }
+    res.json(d.prepare("SELECT a.*, c.name as customer_name FROM arrears a LEFT JOIN customers c ON a.customer_id=c.id WHERE a.id=?").get(req.params.id));
   });
   app.delete("/api/arrears/:id", (req, res) => { db().prepare("DELETE FROM arrears WHERE id=?").run(req.params.id); res.json({ success: true }); });
 
@@ -137,12 +163,13 @@ function startServer(port) {
   app.get("/api/stock", (_, res) => res.json(db().prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id ORDER BY sp.created_at DESC").all()));
   app.post("/api/stock", (req, res) => {
     const d = db(); const p = req.body; const i=id();
-    const product = d.prepare("SELECT purchase_price FROM products WHERE id=?").get(p.productId);
-    const price = p.purchasePrice ?? product?.purchase_price ?? 0;
+    const product = d.prepare("SELECT purchase_price, sale_price FROM products WHERE id=?").get(p.productId);
+    const price = product?.purchase_price ?? 0;
+    const salePrice = product?.sale_price ?? 0;
     const tv = p.quantity * price;
     d.transaction(() => {
-      d.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,company_id,invoice_number,quantity,purchase_price,expiry,total_value) VALUES (?,?,?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.companyId||null, p.invoiceNumber||"", p.quantity, price, p.expiry||null, tv);
-      d.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(p.quantity, price, p.expiry||null, p.productId);
+      d.prepare("INSERT INTO stock_purchases (id,product_id,distributor_id,company_id,invoice_number,quantity,purchase_price,sale_price,expiry,total_value) VALUES (?,?,?,?,?,?,?,?,?,?)").run(i, p.productId, p.distributorId||null, p.companyId||null, p.invoiceNumber||"", p.quantity, price, salePrice, p.expiry||null, tv);
+      d.prepare("UPDATE products SET stock_qty=stock_qty+?, expiry=COALESCE(?,expiry) WHERE id=?").run(p.quantity, p.expiry||null, p.productId);
     })();
     res.json(d.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id WHERE sp.id=?").get(i));
   });
@@ -151,26 +178,27 @@ function startServer(port) {
     const old = d.prepare("SELECT * FROM stock_purchases WHERE id=?").get(req.params.id);
     if (!old) return res.status(404).json({ error: "Not found" });
     const qtyDiff = p.quantity - old.quantity;
-    const price = p.purchasePrice ?? old.purchase_price;
-    const tv = p.quantity * price;
+    const tv = p.quantity * old.purchase_price;
     d.transaction(() => {
-      d.prepare("UPDATE stock_purchases SET quantity=?, purchase_price=?, expiry=?, total_value=?, company_id=?, invoice_number=?, distributor_id=? WHERE id=?").run(p.quantity, price, p.expiry||null, tv, p.companyId||null, p.invoiceNumber||"", p.distributorId||null, req.params.id);
-      d.prepare("UPDATE products SET stock_qty=stock_qty+?, purchase_price=?, expiry=COALESCE(?,expiry) WHERE id=?").run(qtyDiff, price, p.expiry||null, old.product_id);
+      d.prepare("UPDATE stock_purchases SET quantity=?, expiry=?, total_value=?, company_id=?, invoice_number=?, distributor_id=? WHERE id=?").run(p.quantity, p.expiry||null, tv, p.companyId||null, p.invoiceNumber||"", p.distributorId||null, req.params.id);
+      d.prepare("UPDATE products SET stock_qty=stock_qty+?, expiry=COALESCE(?,expiry) WHERE id=?").run(qtyDiff, p.expiry||null, old.product_id);
     })();
     res.json(d.prepare("SELECT sp.*, p.name as product_name, d.name as distributor_name, c.name as company_name FROM stock_purchases sp LEFT JOIN products p ON sp.product_id=p.id LEFT JOIN distributors d ON sp.distributor_id=d.id LEFT JOIN companies c ON sp.company_id=c.id WHERE sp.id=?").get(req.params.id));
   });
 
   // Distributors
-  app.get("/api/distributors", (_, res) => res.json(db().prepare("SELECT d.*, c.name as company_name, (SELECT COUNT(*) FROM products WHERE distributor_id=d.id) as product_count FROM distributors d LEFT JOIN companies c ON d.company_id=c.id ORDER BY d.name").all()));
-  app.post("/api/distributors", (req, res) => { const d = req.body; const i=id(); db().prepare("INSERT INTO distributors (id,name,contact,phone,address,company_id) VALUES (?,?,?,?,?,?)").run(i,d.name,d.contact,d.phone,d.address||"",d.companyId||null); res.json(db().prepare("SELECT d.*, c.name as company_name FROM distributors d LEFT JOIN companies c ON d.company_id=c.id WHERE d.id=?").get(i)); });
-  app.put("/api/distributors/:id", (req, res) => { const d = req.body; db().prepare("UPDATE distributors SET name=?, contact=?, phone=?, address=?, company_id=? WHERE id=?").run(d.name, d.contact, d.phone, d.address, d.companyId||null, req.params.id); res.json(db().prepare("SELECT d.*, c.name as company_name FROM distributors d LEFT JOIN companies c ON d.company_id=c.id WHERE d.id=?").get(req.params.id)); });
-  app.delete("/api/distributors/:id", (req, res) => { db().prepare("DELETE FROM distributors WHERE id=?").run(req.params.id); res.json({ success: true }); });
+  const distributorsDb = require("./db/distributors");
+  app.get("/api/distributors", (_, res) => res.json(distributorsDb.list()));
+  app.post("/api/distributors", (req, res) => res.json(distributorsDb.create(req.body)));
+  app.put("/api/distributors/:id", (req, res) => res.json(distributorsDb.update(req.params.id, req.body)));
+  app.delete("/api/distributors/:id", (req, res) => res.json(distributorsDb.remove(req.params.id)));
 
   // Companies
-  app.get("/api/companies", (_, res) => res.json(db().prepare("SELECT c.*, (SELECT COUNT(*) FROM products WHERE company=c.name) as product_count FROM companies c ORDER BY c.name").all()));
-  app.post("/api/companies", (req, res) => { const c = req.body; const i=id(); db().prepare("INSERT INTO companies (id,name,contact,phone,address,second_number) VALUES (?,?,?,?,?,?)").run(i,c.name,c.contact,c.phone,c.address||"",c.second_number||""); res.json(db().prepare("SELECT * FROM companies WHERE id=?").get(i)); });
-  app.put("/api/companies/:id", (req, res) => { const c = req.body; db().prepare("UPDATE companies SET name=?, contact=?, phone=?, address=?, second_number=? WHERE id=?").run(c.name, c.contact, c.phone, c.address, c.second_number||"", req.params.id); res.json(db().prepare("SELECT * FROM companies WHERE id=?").get(req.params.id)); });
-  app.delete("/api/companies/:id", (req, res) => { db().prepare("DELETE FROM companies WHERE id=?").run(req.params.id); res.json({ success: true }); });
+  const companiesDb = require("./db/companies");
+  app.get("/api/companies", (_, res) => res.json(companiesDb.list()));
+  app.post("/api/companies", (req, res) => res.json(companiesDb.create(req.body)));
+  app.put("/api/companies/:id", (req, res) => res.json(companiesDb.update(req.params.id, req.body)));
+  app.delete("/api/companies/:id", (req, res) => res.json(companiesDb.remove(req.params.id)));
 
   // Returns
   app.get("/api/returns", (_, res) => res.json(db().prepare("SELECT * FROM returns ORDER BY created_at DESC").all()));
@@ -242,6 +270,7 @@ function startServer(port) {
       lowStockCount: d.prepare("SELECT COUNT(*) as c FROM products WHERE stock_qty<=5").get().c,
       expiringSoonCount: d.prepare("SELECT COUNT(*) as c FROM products WHERE expiry IS NOT NULL AND date(expiry) BETWEEN date('now') AND date('now','+30 days')").get().c,
       weekRevenue: d.prepare("SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue FROM sales WHERE created_at>=datetime('now','-7 days') GROUP BY date(created_at) ORDER BY day").all(),
+      monthRevenue: d.prepare("SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue FROM sales WHERE created_at>=datetime('now','-30 days') GROUP BY date(created_at) ORDER BY day").all(),
       topProducts: d.prepare("SELECT si.product_name as name, SUM(si.quantity) as value FROM sale_items si GROUP BY si.product_name ORDER BY value DESC LIMIT 5").all(),
     });
   });

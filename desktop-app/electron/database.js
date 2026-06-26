@@ -38,7 +38,7 @@ function generateToken() {
 const WORDS = require("./wordlist");
 
 function generateRecoveryPhrase() {
-  const bytes = crypto.randomBytes(16);
+  const bytes = crypto.randomBytes(24);
   const indices = [];
   for (let i = 0; i < 12; i++) {
     const idx = (bytes[i * 2] << 8 | bytes[i * 2 + 1]) % WORDS.length;
@@ -156,6 +156,7 @@ function initializeDatabase() {
   try { db.exec("ALTER TABLE products ADD COLUMN markup_percent REAL NOT NULL DEFAULT 20"); } catch {}
   try { db.exec("ALTER TABLE stock_purchases ADD COLUMN company_id TEXT REFERENCES companies(id)"); } catch {}
   try { db.exec("ALTER TABLE stock_purchases ADD COLUMN invoice_number TEXT NOT NULL DEFAULT ''"); } catch {}
+  try { db.exec("ALTER TABLE stock_purchases ADD COLUMN sale_price REAL NOT NULL DEFAULT 0"); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS recovery_keys (
@@ -169,9 +170,6 @@ function initializeDatabase() {
   const userCount = db.prepare("SELECT COUNT(*) as c FROM users").get();
   if (userCount.c === 0) seed();
 
-  const productCount = db.prepare("SELECT COUNT(*) as c FROM products").get();
-  if (productCount.c === 0) seedProducts();
-
   return db;
 }
 
@@ -179,32 +177,6 @@ function seed() {
   const now = new Date().toISOString();
   db.prepare("INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?,?,?,?,?)")
     .run("u1", "admin", hashPassword("admin123"), "admin", now);
-}
-
-function seedProducts() {
-  const now = new Date().toISOString();
-  const tx = db.transaction(() => {
-    const ip = db.prepare("INSERT INTO products (id, barcode, name, company, category, location, sale_price, purchase_price, stock_qty, expiry, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    ip.run("p1","8901234567890","Amoxicillin 500mg","GSK","Tablets","Shelf A1",120,80,45,"2026-12-31",now);
-    ip.run("p2","8901234567891","Paracetamol 500mg","Pfizer","Tablets","Shelf A2",50,30,120,"2027-06-30",now);
-    ip.run("p3","8901234567892","Omeprazole 20mg","Abbott","Capsules","Shelf B1",85,55,3,"2026-09-15",now);
-    ip.run("p4","8901234567893","Atorvastatin 10mg","Pfizer","Tablets","Shelf A2",150,100,28,"2027-03-20",now);
-    ip.run("p5","8901234567894","Metformin 500mg","Sanofi","Tablets","Shelf A3",60,35,67,"2026-11-30",now);
-    ip.run("p6","8901234567895","Losartan 50mg","MSD","Tablets","Shelf A1",95,65,15,"2026-07-31",now);
-    ip.run("p7","8901234567896","Aspirin 75mg","Bayer","Tablets","Shelf B2",30,18,200,"2028-01-15",now);
-
-    const id = db.prepare("INSERT INTO distributors (id, name, contact, phone, address, created_at) VALUES (?,?,?,?,?,?)");
-    id.run("d1","HealthPlus Distributors","Mr. Ali Raza","0300-1111111","Karachi",now);
-    id.run("d2","MediCare Supply Co.","Mr. Usman Khan","0300-2222222","Lahore",now);
-    id.run("d3","PharmaLink Trading","Mrs. Fatima Ahmed","0300-3333333","Islamabad",now);
-
-    const ic = db.prepare("INSERT INTO customers (id, name, phone, created_at) VALUES (?,?,?,?)");
-    ic.run("c1","Ahmed Khan","0300-1234567",now);
-    ic.run("c2","Fatima Ali","0301-2345678",now);
-    ic.run("c3","Usman Raza","0302-3456789",now);
-    ic.run("c4","Sara Mahmood","0303-4567890",now);
-  });
-  tx();
 }
 
 function getDatabase() {

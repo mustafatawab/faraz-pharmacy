@@ -18,12 +18,12 @@ export default function Companies() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", contact: "", phone: "", address: "", second_number: "" });
+  const [form, setForm] = useState({ name: "", phone: "", address: "", second_number: "" });
 
   const { data: companies = [], isLoading } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
 
   const filtered = companies.filter((c: Company) =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.contact.toLowerCase().includes(search.toLowerCase())
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search)
   );
 
   const createMutation = useMutation({
@@ -32,7 +32,7 @@ export default function Companies() {
       toast.success("Company created");
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       setOpen(false);
-      setForm({ name: "", contact: "", phone: "", address: "", second_number: "" });
+      setForm({ name: "", phone: "", address: "", second_number: "" });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -44,7 +44,7 @@ export default function Companies() {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       setOpen(false);
       setEditingId(null);
-      setForm({ name: "", contact: "", phone: "", address: "", second_number: "" });
+      setForm({ name: "", phone: "", address: "", second_number: "" });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -60,13 +60,13 @@ export default function Companies() {
 
   function openAdd() {
     setEditingId(null);
-    setForm({ name: "", contact: "", phone: "", address: "", second_number: "" });
+    setForm({ name: "", phone: "", address: "", second_number: "" });
     setOpen(true);
   }
 
   function openEdit(c: Company) {
     setEditingId(c.id);
-    setForm({ name: c.name, contact: c.contact, phone: c.phone, address: c.address, second_number: c.second_number });
+    setForm({ name: c.name, phone: c.phone, address: c.address, second_number: c.second_number });
     setOpen(true);
   }
 
@@ -78,10 +78,10 @@ export default function Companies() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
           <Input placeholder="Search companies..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Button variant="outline" size="sm" onClick={() => downloadCSV(`companies_${new Date().toISOString().split("T")[0]}.csv`, ["Name","Contact","Phone","Address","Second Number","Products"], filtered.map((c: Company) => [c.name, c.contact, c.phone, c.address, c.second_number||"", c.product_count||0]))}>
+        <Button variant="outline" size="sm" onClick={() => downloadCSV(`companies_${new Date().toISOString().split("T")[0]}.csv`, ["Name","Company Contact","Contact #2","Address","Products"], filtered.map((c: Company) => [c.name, c.phone, c.second_number||"", c.address, c.product_count||0]))}>
           <Download className="h-4 w-4 mr-1" /> CSV
         </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadPDF(`companies_${new Date().toISOString().split("T")[0]}.pdf`, "Companies List", ["Name","Contact","Phone","Address","Second Number","Products"], filtered.map((c: Company) => [c.name, c.contact, c.phone, c.address, c.second_number||"", c.product_count||0]))}>
+        <Button variant="outline" size="sm" onClick={() => downloadPDF(`companies_${new Date().toISOString().split("T")[0]}.pdf`, "Companies List", ["Name","Company Contact","Contact #2","Address","Products"], filtered.map((c: Company) => [c.name, c.phone, c.second_number||"", c.address, c.product_count||0]))}>
           <Download className="h-4 w-4 mr-1" /> PDF
         </Button>
       </div>
@@ -101,11 +101,10 @@ export default function Companies() {
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-medium text-text-primary truncate">{comp.name}</h3>
-                      <p className="text-xs text-text-secondary mt-0.5">{comp.contact}</p>
-                      <div className="flex items-center gap-3 mt-2">
-                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{comp.phone}</div>
-                        {comp.second_number && <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3" />{comp.second_number}</div>}
-                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3" />{comp.product_count ?? 0} products</div>
+                      <div className="space-y-1 mt-2">
+                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3 shrink-0" />{comp.phone}</div>
+                        {comp.second_number && <div className="flex items-center gap-1 text-xs text-text-secondary"><Phone className="h-3 w-3 shrink-0" />{comp.second_number}</div>}
+                        <div className="flex items-center gap-1 text-xs text-text-secondary"><Package className="h-3 w-3 shrink-0" />{comp.product_count ?? 0} products</div>
                       </div>
                     </div>
                   </div>
@@ -131,28 +130,24 @@ export default function Companies() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Name</Label>
+              <Label>Company Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <div>
-              <Label>Contact Person</Label>
-              <Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
-            </div>
-            <div>
-              <Label>Address</Label>
-              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Phone</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <Label>Company Contact</Label>
+                <Input inputMode="numeric" pattern="[0-9]*" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 11) })} />
               </div>
               <div>
-                <Label>Second Number</Label>
-                <Input value={form.second_number} onChange={(e) => setForm({ ...form, second_number: e.target.value })} />
+                <Label>Contact #2</Label>
+                <Input inputMode="numeric" pattern="[0-9]*" value={form.second_number} onChange={(e) => setForm({ ...form, second_number: e.target.value.replace(/\D/g, "").slice(0, 11) })} />
               </div>
             </div>
-            <Button className="w-full" disabled={!form.name || createMutation.isPending || updateMutation.isPending}
+            <div>
+              <Label>Address (optional)</Label>
+              <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={3} className="flex w-full rounded-lg border border-border bg-transparent px-3 py-2 text-sm placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent disabled:cursor-not-allowed disabled:opacity-50 resize-none" />
+            </div>
+            <Button className="w-full" disabled={!form.name || form.phone.length !== 11 || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Company" : "Add Company"}
             </Button>

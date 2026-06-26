@@ -17,9 +17,10 @@ interface DataTableProps<T> {
   loading?: boolean;
   keyExtractor: (item: T) => string;
   onRowClick?: (item: T) => void;
+  emptyMessage?: string;
 }
 
-export default function DataTable<T>({ columns, data, loading, keyExtractor, onRowClick }: DataTableProps<T>) {
+export default function DataTable<T>({ columns, data, loading, keyExtractor, onRowClick, emptyMessage }: DataTableProps<T>) {
   if (loading) {
     return (
       <Table>
@@ -58,7 +59,7 @@ export default function DataTable<T>({ columns, data, loading, keyExtractor, onR
         {data.length === 0 ? (
           <TableRow>
             <TableCell colSpan={columns.length} className="text-center text-text-secondary py-8">
-              No data found
+              {emptyMessage || "No data found"}
             </TableCell>
           </TableRow>
         ) : (
