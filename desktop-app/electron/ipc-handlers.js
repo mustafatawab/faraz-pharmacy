@@ -155,7 +155,22 @@ function registerHandlers() {
   ipcMain.handle("customers:search", (_, q) => { const s=`%${q}%`; return getDatabase().prepare("SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name LIMIT 20").all(s,s); });
   ipcMain.handle("customers:create", (_, c) => { const i=id(); getDatabase().prepare("INSERT INTO customers (id,name,phone,address) VALUES (?,?,?,?)").run(i,c.name,c.phone,c.address||""); return getDatabase().prepare("SELECT * FROM customers WHERE id=?").get(i); });
   ipcMain.handle("customers:update", (_, id, c) => { getDatabase().prepare("UPDATE customers SET name=?, phone=?, address=? WHERE id=?").run(c.name, c.phone, c.address||"", id); return getDatabase().prepare("SELECT * FROM customers WHERE id=?").get(id); });
-  ipcMain.handle("customers:delete", (_, id) => { getDatabase().prepare("DELETE FROM customers WHERE id=?").run(id); return { success: true }; });
+  ipcMain.handle("customers:delete", (_, id, opts = {}) => {
+    const db = getDatabase();
+    const salesCount = db.prepare("SELECT COUNT(*) as c FROM sales WHERE customer_id=?").get(id).c;
+    const arrearsCount = db.prepare("SELECT COUNT(*) as c FROM arrears WHERE customer_id=?").get(id).c;
+    if ((salesCount > 0 || arrearsCount > 0) && !opts.force) {
+      return { error: `Customer has ${salesCount} invoice(s) and ${arrearsCount} arrear(s). Use force delete to remove.`, salesCount, arrearsCount };
+    }
+    db.transaction(() => {
+      if (opts.force) {
+        db.prepare("UPDATE sales SET customer_id=NULL WHERE customer_id=?").run(id);
+        db.prepare("DELETE FROM arrears WHERE customer_id=?").run(id);
+      }
+      db.prepare("DELETE FROM customers WHERE id=?").run(id);
+    })();
+    return { success: true };
+  });
   ipcMain.handle("customers:get-by-id", (_, id) => {
     const c = getDatabase().prepare("SELECT c.*, (SELECT COUNT(*) FROM sales WHERE customer_id=c.id) as total_purchases, (SELECT COALESCE(SUM(balance_due),0) FROM arrears WHERE customer_id=c.id AND status='pending') as outstanding_arrear FROM customers c WHERE c.id=?").get(id);
     if (c) { c.purchases = getDatabase().prepare("SELECT s.*,(SELECT COUNT(*) FROM sale_items WHERE sale_id=s.id) as item_count FROM sales s WHERE s.customer_id=? ORDER BY s.created_at DESC").all(id); c.arrears = getDatabase().prepare("SELECT * FROM arrears WHERE customer_id=? ORDER BY created_at DESC").all(id); }

@@ -106,7 +106,24 @@ function startServer(port) {
   });
   app.post("/api/customers", (req, res) => { const c = req.body; const i=id(); db().prepare("INSERT INTO customers (id,name,phone,address) VALUES (?,?,?,?)").run(i,c.name,c.phone,c.address||""); res.json(db().prepare("SELECT * FROM customers WHERE id=?").get(i)); });
   app.put("/api/customers/:id", (req, res) => { const c = req.body; db().prepare("UPDATE customers SET name=?, phone=?, address=? WHERE id=?").run(c.name, c.phone, c.address||"", req.params.id); res.json(db().prepare("SELECT * FROM customers WHERE id=?").get(req.params.id)); });
-  app.delete("/api/customers/:id", (req, res) => { db().prepare("DELETE FROM customers WHERE id=?").run(req.params.id); res.json({ success: true }); });
+  app.delete("/api/customers/:id", (req, res) => {
+    const d = db();
+    const id = req.params.id;
+    const force = req.query.force === "true";
+    const salesCount = d.prepare("SELECT COUNT(*) as c FROM sales WHERE customer_id=?").get(id).c;
+    const arrearsCount = d.prepare("SELECT COUNT(*) as c FROM arrears WHERE customer_id=?").get(id).c;
+    if ((salesCount > 0 || arrearsCount > 0) && !force) {
+      return res.status(400).json({ error: `Customer has ${salesCount} invoice(s) and ${arrearsCount} arrear(s). Use force delete to remove.`, salesCount, arrearsCount });
+    }
+    d.transaction(() => {
+      if (force) {
+        d.prepare("UPDATE sales SET customer_id=NULL WHERE customer_id=?").run(id);
+        d.prepare("DELETE FROM arrears WHERE customer_id=?").run(id);
+      }
+      d.prepare("DELETE FROM customers WHERE id=?").run(id);
+    })();
+    res.json({ success: true });
+  });
 
   // Arrears
   app.get("/api/arrears", (req, res) => {

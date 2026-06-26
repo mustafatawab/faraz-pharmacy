@@ -64,8 +64,8 @@ const api = {
       isClient() ? fetchJson("POST", "/api/customers", c) : window.electronAPI.customers.create(c),
     update: (id: string, c: CustomerInput): Promise<Customer> =>
       isClient() ? fetchJson("PUT", `/api/customers/${id}`, c) : window.electronAPI.customers.update(id, c),
-    delete: (id: string): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("DELETE", `/api/customers/${id}`) : window.electronAPI.customers.delete(id),
+    delete: (id: string, opts?: { force?: boolean }): Promise<{ success: boolean }> =>
+      isClient() ? fetchJson("DELETE", `/api/customers/${id}${opts?.force ? "?force=true" : ""}`) : window.electronAPI.customers.delete(id, opts || {}),
     getById: (id: string): Promise<Customer | null> =>
       isClient() ? fetchJson("GET", `/api/customers/${id}`) : window.electronAPI.customers.getById(id),
   },

@@ -145,7 +145,7 @@ export default function Stock() {
             <div>
               <Label>Product</Label>
                 <SearchableSelect
-                  options={products.map((p: Product) => ({ value: p.id, label: `${p.name} (${p.barcode})` }))}
+                  options={products.map((p: Product) => ({ value: p.id, label: `${p.name} — ${p.category || "No Category"}` }))}
                   value={form.productId}
                   onChange={(v) => setForm({ ...form, productId: v })}
                   placeholder="Select product"

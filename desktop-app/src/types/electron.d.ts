@@ -29,7 +29,7 @@ export interface ElectronAPI {
     search(q: string): Promise<Customer[]>;
     create(c: CustomerInput): Promise<Customer>;
     update(id: string, c: CustomerInput): Promise<Customer>;
-    delete(id: string): Promise<{ success: boolean }>;
+    delete(id: string, opts?: { force?: boolean }): Promise<{ success: boolean }>;
     getById(id: string): Promise<Customer | null>;
   };
   arrears: {
