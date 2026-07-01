@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
-import type { ReturnEntry, Sale, SaleItem } from "@/types";
+import type { ReturnEntry, Sale, SaleItem, PrinterConfig } from "@/types";
 
 function today() {
   return new Date().toISOString().split("T")[0];
@@ -22,7 +22,7 @@ function today() {
 export default function Returns() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [printerConfig, setPrinterConfig] = useState<{ paperSize: string; deviceName: string | null }>({ paperSize: "thermal", deviceName: null });
+  const [printerConfig, setPrinterConfig] = useState<PrinterConfig>({ paperSize: "thermal", deviceName: null });
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(today());
   const [selectedSaleId, setSelectedSaleId] = useState("");

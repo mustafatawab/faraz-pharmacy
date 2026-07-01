@@ -24,7 +24,7 @@ export interface ProductInput {
   barcode: string;
   name: string;
   distributorId?: string;
-  salePrice: number;
+  salePrice?: number;
   purchasePrice: number;
   markupPercent?: number;
   category?: string;
@@ -198,7 +198,7 @@ export interface ReturnInput {
   items: ReturnItemInput[];
 }
 
-export interface ReturnResult extends ReturnEntry {
+export interface ReturnResult extends Omit<ReturnEntry, "reason"> {
   items?: ReturnItemInput[];
   reason?: string;
 }
