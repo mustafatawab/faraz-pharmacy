@@ -1,0 +1,43 @@
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import { errorHandler } from "./middleware/errors";
+import { authRoutes } from "./modules/auth/auth.routes";
+import { medicinesRoutes } from "./modules/medicines/medicines.routes";
+import { salesRoutes } from "./modules/sales/sales.routes";
+import { customersRoutes } from "./modules/customers/customers.routes";
+import { arrearsRoutes } from "./modules/arrears/arrears.routes";
+import { purchasesRoutes } from "./modules/purchases/purchases.routes";
+import { suppliersRoutes } from "./modules/suppliers/suppliers.routes";
+import { companiesRoutes } from "./modules/companies/companies.routes";
+import { returnsRoutes } from "./modules/returns/returns.routes";
+import { expensesRoutes } from "./modules/expenses/expenses.routes";
+import { reportsRoutes } from "./modules/reports/reports.routes";
+import { settingsRoutes } from "./modules/settings/settings.routes";
+
+const app = express();
+
+app.use(cors());
+app.use(helmet());
+app.use(express.json());
+
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+app.use("/api/auth", authRoutes);
+app.use("/api/products", medicinesRoutes);
+app.use("/api/sales", salesRoutes);
+app.use("/api/customers", customersRoutes);
+app.use("/api/arrears", arrearsRoutes);
+app.use("/api/stock", purchasesRoutes);
+app.use("/api/distributors", suppliersRoutes);
+app.use("/api/companies", companiesRoutes);
+app.use("/api/returns", returnsRoutes);
+app.use("/api/expenses", expensesRoutes);
+app.use("/api/dashboard", reportsRoutes);
+app.use("/api/settings", settingsRoutes);
+
+app.use(errorHandler);
+
+export { app };
