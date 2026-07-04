@@ -176,14 +176,10 @@ export default function Settings() {
     setLoginError("");
     setLoggingIn(true);
     try {
-      const res = await window.authLogin({ username: adminUser, password: adminPass });
-      if (res.error) {
-        setLoginError("Invalid admin credentials");
-        return;
-      }
+      const res = await api.auth.login(adminUser, adminPass);
       setLocked(false);
     } catch {
-      setLoginError("Authentication failed");
+      setLoginError("Invalid admin credentials");
     } finally {
       setLoggingIn(false);
     }

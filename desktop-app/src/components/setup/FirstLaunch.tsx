@@ -45,7 +45,7 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
           <div className="bg-surface-2 rounded-xl p-4 mb-6 border border-border">
             <p className="text-xs text-text-secondary mb-1">This machine's IP address</p>
             <p className="text-2xl font-mono font-bold text-accent">{myIp}</p>
-            <p className="text-xs text-text-secondary mt-2">Port: <span className="font-mono">3456</span></p>
+            <p className="text-xs text-text-secondary mt-2">Port: <span className="font-mono">3001</span></p>
           </div>
           <div className="bg-warning/5 border border-warning/20 rounded-xl p-4 mb-6 text-left">
             <div className="flex items-start gap-2">
@@ -146,7 +146,7 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
               <Button
                 className="flex-1"
                 disabled={!serverIp}
-                onClick={() => save({ mode: "client", serverUrl: `http://${serverIp}:3456` })}
+                onClick={() => save({ mode: "client", serverUrl: `http://${serverIp}:3001` })}
               >
                 {saving ? "Saving..." : "Connect"}
               </Button>
