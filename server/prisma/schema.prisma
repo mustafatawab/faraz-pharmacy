@@ -60,8 +60,22 @@ model Product {
   saleItems      SaleItem[]
   stockPurchases StockPurchase[]
   returnItems    ReturnItem[]
+  prices         ProductPrice[]
 
   @@map("products")
+}
+
+model ProductPrice {
+  id            String   @id @default(uuid())
+  productId     String   @map("product_id")
+  label         String   @default("Standard")
+  purchasePrice Float    @default(0) @map("purchase_price")
+  salePrice     Float    @default(0) @map("sale_price")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_prices")
 }
 
 model Distributor {

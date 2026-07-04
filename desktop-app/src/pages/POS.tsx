@@ -26,7 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import type { Product, PrinterConfig } from "@/types";
+import { formatCurrency } from "@/lib/utils";
+import type { Product, PrinterConfig, ProductPrice } from "@/types";
 
 const PAPER_SIZES = [
   { value: "thermal", label: "Thermal (80mm)", icon: Printer },
@@ -45,6 +46,12 @@ export default function POS() {
   const [printerConfig, setPrinterConfig] = useState<PrinterConfig>({ paperSize: "thermal", deviceName: null });
   const [printers, setPrinters] = useState<{ name: string; displayName: string; isDefault: boolean }[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<string>("default");
+
+  const [pricePickerOpen, setPricePickerOpen] = useState(false);
+  const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
+  const pendingPrices = pendingProduct
+    ? ((pendingProduct as any).prices as ProductPrice[] | undefined)
+    : undefined;
 
   useEffect(() => {
     if (window.electronAPI?.printers) {
@@ -73,24 +80,41 @@ export default function POS() {
     return allProducts.data ?? [];
   }, [debouncedSearch, products, allProducts.data]);
 
+  function addProductToCart(product: Product, salePrice: number) {
+    if (product.stock_qty === 0) {
+      setError(`${product.name} is out of stock`);
+      return;
+    }
+    cart.addItem({ ...product, sale_price: salePrice });
+  }
+
+  function promptPriceTier(product: Product) {
+    const tiers = (product as any).prices as ProductPrice[] | undefined;
+    if (tiers && tiers.length > 0) {
+      setPendingProduct(product);
+      setPricePickerOpen(true);
+    } else {
+      addProductToCart(product, product.sale_price);
+    }
+  }
+
+  function handleTierSelect(tierSalePrice: number) {
+    if (!pendingProduct) return;
+    addProductToCart(pendingProduct, tierSalePrice);
+    setPendingProduct(null);
+    setPricePickerOpen(false);
+  }
+
   const handleBarcodeSubmit = async (value: string) => {
     const product = await api.products.getByBarcode(value);
     if (product) {
-      if (product.stock_qty === 0) {
-        setError(`${product.name} is out of stock`);
-        return;
-      }
-      cart.addItem(product as unknown as Product);
+      promptPriceTier(product);
     } else {
       const found = displayProducts.find(
         (p: Product) => p.barcode === value || p.name.toLowerCase() === value.toLowerCase()
       );
       if (found) {
-        if (found.stock_qty === 0) {
-          setError(`${found.name} is out of stock`);
-          return;
-        }
-        cart.addItem(found);
+        promptPriceTier(found);
       }
     }
   };
@@ -100,7 +124,7 @@ export default function POS() {
       setError(`${product.name} is out of stock`);
       return;
     }
-    cart.addItem(product);
+    promptPriceTier(product);
   };
 
   const [pendingPrintData, setPendingPrintData] = useState<unknown>(null);
@@ -230,6 +254,40 @@ export default function POS() {
           />
         </div>
       </div>
+
+      <AlertDialog open={pricePickerOpen} onOpenChange={(v) => { if (!v) { setPendingProduct(null); setPricePickerOpen(false); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Select Price Tier</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingProduct?.name ?? "Product"} has multiple price tiers. Choose one to add to cart.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <button
+              onClick={() => pendingProduct && handleTierSelect(pendingProduct.sale_price ?? 0)}
+              className="w-full text-left p-3 rounded-lg border-2 border-border hover:border-accent/50 transition-colors flex items-center justify-between"
+            >
+              <span className="font-medium">Standard</span>
+              <span className="font-mono font-bold text-accent">{formatCurrency(pendingProduct?.sale_price ?? 0)}</span>
+            </button>
+            {pendingPrices?.map((tier) => (
+              <button
+                key={tier.id}
+                onClick={() => handleTierSelect(tier.salePrice)}
+                className="w-full text-left p-3 rounded-lg border-2 border-border hover:border-accent/50 transition-colors flex items-center justify-between"
+              >
+                <span className="font-medium">{tier.label || "Untitled"}</span>
+                <span className="font-mono font-bold text-accent">{formatCurrency(tier.salePrice)}</span>
+              </button>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPendingProduct(null); }}>Cancel</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

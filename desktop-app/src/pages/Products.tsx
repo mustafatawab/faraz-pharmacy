@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Search, Archive, RotateCcw, Pencil, Download, Upload } from "lucide-react";
+import { Plus, Search, Archive, RotateCcw, Pencil, Download, Upload, Trash2 } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCurrency, generateBarcode } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
-import type { Product } from "@/types";
+import type { Product, ProductPriceInput } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/types";
 
 interface CsvRow {
@@ -31,14 +31,24 @@ const HEADER_LOOKUP: Record<string, string> = {
   "expiry date": "expiry", "expiry time": "expiry", "expiry": "expiry",
 };
 
+interface PriceTierForm {
+  label: string; purchasePrice: string; salePrice: string;
+}
+
 interface ProductForm {
   barcode: string; name: string; category: string; location: string;
   purchasePrice: string; salePrice: string; expiry: string;
+  prices: PriceTierForm[];
 }
+
+const emptyPriceTier = (): PriceTierForm => ({
+  label: "", purchasePrice: "", salePrice: "",
+});
 
 const emptyForm = (): ProductForm => ({
   barcode: generateBarcode(), name: "", category: "", location: "",
   purchasePrice: "", salePrice: "", expiry: "",
+  prices: [],
 });
 
 export default function Products() {
@@ -49,15 +59,37 @@ export default function Products() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm());
+  const [barcodeExists, setBarcodeExists] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState<CsvRow[]>([]);
   const [importImporting, setImportImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products", showArchived],
     queryFn: () => showArchived ? api.products.listAll() : api.products.list(),
   });
+
+  useEffect(() => {
+    if (open && barcodeInputRef.current) {
+      setTimeout(() => barcodeInputRef.current?.focus(), 100);
+    }
+  }, [open]);
+
+  async function checkBarcode(barcode: string) {
+    if (!barcode.trim()) { setBarcodeExists(null); return; }
+    try {
+      const existing = await api.products.getByBarcode(barcode.trim());
+      if (existing && existing.id !== editingId) {
+        setBarcodeExists(`Barcode already in use by "${existing.name}"`);
+      } else {
+        setBarcodeExists(null);
+      }
+    } catch {
+      setBarcodeExists(null);
+    }
+  }
 
   const filtered = products.filter((p: Product) =>
     !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -65,12 +97,23 @@ export default function Products() {
     p.location.toLowerCase().includes(search.toLowerCase())
   );
 
+  function buildPricesPayload(): ProductPriceInput[] | undefined {
+    const validPrices = form.prices.filter((p) => p.purchasePrice);
+    if (validPrices.length === 0) return undefined;
+    return validPrices.map((p) => ({
+      label: p.label || undefined,
+      purchasePrice: Number(p.purchasePrice),
+      salePrice: Number(p.salePrice) || 0,
+    }));
+  }
+
   const createMutation = useMutation({
     mutationFn: () => api.products.create({
       barcode: form.barcode, name: form.name, category: form.category,
       location: form.location, purchasePrice: Number(form.purchasePrice),
       salePrice: Number(form.salePrice) || 0,
       expiry: form.expiry || undefined,
+      prices: buildPricesPayload(),
     }),
     onSuccess: (product) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -89,6 +132,7 @@ export default function Products() {
       location: form.location, purchasePrice: Number(form.purchasePrice),
       salePrice: Number(form.salePrice) || 0,
       expiry: form.expiry || undefined,
+      prices: buildPricesPayload(),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -126,18 +170,39 @@ export default function Products() {
   function openAdd() {
     setEditingId(null);
     setForm(emptyForm());
+    setBarcodeExists(null);
     setOpen(true);
   }
 
   function openEdit(product: Product) {
     setEditingId(product.id);
+    const p = (product as any).prices as { label: string; purchasePrice: number; salePrice: number }[] | undefined;
     setForm({
       barcode: product.barcode, name: product.name, category: product.category,
       location: product.location, purchasePrice: String(product.purchase_price),
       salePrice: String(product.sale_price),
       expiry: product.expiry || "",
+      prices: p
+        ? p.map((pt) => ({ label: pt.label, purchasePrice: String(pt.purchasePrice), salePrice: String(pt.salePrice) }))
+        : [],
     });
+    setBarcodeExists(null);
     setOpen(true);
+  }
+
+  function addPriceTier() {
+    setForm((prev) => ({ ...prev, prices: [...prev.prices, emptyPriceTier()] }));
+  }
+
+  function removePriceTier(index: number) {
+    setForm((prev) => ({ ...prev, prices: prev.prices.filter((_, i) => i !== index) }));
+  }
+
+  function updatePriceTier(index: number, field: keyof PriceTierForm, value: string) {
+    setForm((prev) => ({
+      ...prev,
+      prices: prev.prices.map((pt, i) => (i === index ? { ...pt, [field]: value } : pt)),
+    }));
   }
 
   function normalizeHeader(h: string) {
@@ -318,8 +383,8 @@ export default function Products() {
     { key: "name", header: "Name", cell: (p: Product) => (
       <span className={`font-medium ${p.active ? "text-text-primary" : "text-text-secondary line-through"}`}>{p.name}</span>
     ) },
-    { key: "category", header: "Category", cell: (p: Product) => <span className="text-xs text-text-secondary bg-surface-2 px-2 py-0.5 rounded-full">{p.category || "—"}</span> },
-    { key: "location", header: "Location", cell: (p: Product) => <span className="text-xs font-mono text-text-secondary">{p.location || "—"}</span> },
+    { key: "category", header: "Category", cell: (p: Product) => <span className="text-xs text-text-secondary bg-surface-2 px-2 py-0.5 rounded-full">{p.category || "\u2014"}</span> },
+    { key: "location", header: "Location", cell: (p: Product) => <span className="text-xs font-mono text-text-secondary">{p.location || "\u2014"}</span> },
     { key: "salePrice", header: "Sale Price", cell: (p: Product) => <span className="font-mono font-medium">{formatCurrency(p.sale_price)}</span> },
     { key: "stockQty", header: "Stock", cell: (p: Product) => (
       <span className={`font-mono font-medium ${p.stock_qty <= 5 ? "text-danger" : p.active ? "text-text-primary" : "text-text-secondary"}`}>{p.stock_qty}</span>
@@ -483,14 +548,22 @@ export default function Products() {
       </Dialog>
 
       <Dialog open={open} onOpenChange={(v) => { if (!v) { setEditingId(null); } setOpen(v); }}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Product" : "Add Product"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
             <div>
               <Label>Barcode</Label>
-              <Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className="font-mono" />
+              <Input
+                ref={barcodeInputRef}
+                value={form.barcode}
+                onChange={(e) => { setForm({ ...form, barcode: e.target.value }); checkBarcode(e.target.value); }}
+                className="font-mono"
+              />
+              {barcodeExists && (
+                <p className="text-xs text-danger mt-1">{barcodeExists}</p>
+              )}
             </div>
             <div>
               <Label>Name</Label>
@@ -523,6 +596,59 @@ export default function Products() {
                 <Input type="number" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} />
               </div>
             </div>
+
+            <div className="border border-border rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Additional Price Tiers</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addPriceTier} className="h-7 gap-1">
+                  <Plus className="h-3.5 w-3.5" /> Add Tier
+                </Button>
+              </div>
+              {form.prices.length === 0 && (
+                <p className="text-xs text-text-secondary">No additional prices. Click "Add Tier" to add more purchase/sale price pairs.</p>
+              )}
+              {form.prices.map((pt, i) => (
+                <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-surface-2">
+                  <div className="flex-1 grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-[10px] text-text-secondary">Label</Label>
+                      <Input
+                        value={pt.label}
+                        onChange={(e) => updatePriceTier(i, "label", e.target.value)}
+                        placeholder="e.g. Wholesale"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-text-secondary">Purchase</Label>
+                      <Input
+                        type="number"
+                        value={pt.purchasePrice}
+                        onChange={(e) => updatePriceTier(i, "purchasePrice", e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-text-secondary">Sale</Label>
+                      <Input
+                        type="number"
+                        value={pt.salePrice}
+                        onChange={(e) => updatePriceTier(i, "salePrice", e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removePriceTier(i)}
+                    className="h-8 w-8 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors mt-5 shrink-0"
+                    title="Remove tier"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
             <div>
               <Label>Expiry (optional)</Label>
               <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} min={new Date().toISOString().split("T")[0]} />

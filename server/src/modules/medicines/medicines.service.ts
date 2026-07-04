@@ -5,23 +5,34 @@ import type { CreateProductInput } from "./medicines.schema";
 export const medicinesService = {
   async list(includeArchived = false) {
     const where = includeArchived ? {} : { active: 1 };
-    return prisma.product.findMany({ where, orderBy: { name: "asc" } });
+    return prisma.product.findMany({
+      where,
+      orderBy: { name: "asc" },
+      include: { prices: true },
+    });
   },
 
   async search(query: string) {
     const q = `%${query}%`;
-    return prisma.$queryRawUnsafe<unknown[]>(
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
       `SELECT * FROM products WHERE active = 1 AND (barcode ILIKE $1 OR name ILIKE $1) ORDER BY name LIMIT 50`,
       q,
     );
+    return rows;
   },
 
   async getByBarcode(barcode: string) {
-    return prisma.product.findUnique({ where: { barcode } });
+    return prisma.product.findUnique({
+      where: { barcode },
+      include: { prices: true },
+    });
   },
 
   async getById(id: string) {
-    const product = await prisma.product.findUnique({ where: { id } });
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: { prices: true },
+    });
     if (!product) throw new NotFoundError("Product");
     return product;
   },
@@ -30,6 +41,16 @@ export const medicinesService = {
     const salePrice = data.salePrice && data.salePrice > 0
       ? data.salePrice
       : Math.round(data.purchasePrice * (1 + (data.markupPercent ?? 20) / 100));
+
+    const pricesData = data.prices && data.prices.length > 0
+      ? data.prices.map((p) => ({
+          label: p.label ?? "Standard",
+          purchasePrice: p.purchasePrice,
+          salePrice: p.salePrice && p.salePrice > 0
+            ? p.salePrice
+            : Math.round(p.purchasePrice * (1 + (data.markupPercent ?? 20) / 100)),
+        }))
+      : [];
 
     return prisma.product.create({
       data: {
@@ -44,7 +65,9 @@ export const medicinesService = {
         markupPercent: data.markupPercent ?? 20,
         stockQty: data.stockQty ?? 0,
         expiry: data.expiry ?? null,
+        prices: { createMany: { data: pricesData } },
       },
+      include: { prices: true },
     });
   },
 
@@ -56,21 +79,37 @@ export const medicinesService = {
       ? data.salePrice
       : Math.round(data.purchasePrice * (1 + (data.markupPercent ?? old.markupPercent) / 100));
 
+    const updateData: Record<string, unknown> = {
+      barcode: data.barcode,
+      name: data.name,
+      company: data.company ?? "",
+      category: data.category ?? "",
+      location: data.location ?? "",
+      distributorId: data.distributorId ?? null,
+      salePrice,
+      purchasePrice: data.purchasePrice,
+      markupPercent: data.markupPercent ?? old.markupPercent,
+      stockQty: data.stockQty ?? 0,
+      expiry: data.expiry ?? null,
+    };
+
+    if (data.prices) {
+      const pricesData = data.prices.map((p) => ({
+        label: p.label ?? "Standard",
+        purchasePrice: p.purchasePrice,
+        salePrice: p.salePrice && p.salePrice > 0
+          ? p.salePrice
+          : Math.round(p.purchasePrice * (1 + (data.markupPercent ?? old.markupPercent) / 100)),
+      }));
+
+      await prisma.productPrice.deleteMany({ where: { productId: id } });
+      updateData.prices = { createMany: { data: pricesData } };
+    }
+
     return prisma.product.update({
       where: { id },
-      data: {
-        barcode: data.barcode,
-        name: data.name,
-        company: data.company ?? "",
-        category: data.category ?? "",
-        location: data.location ?? "",
-        distributorId: data.distributorId ?? null,
-        salePrice,
-        purchasePrice: data.purchasePrice,
-        markupPercent: data.markupPercent ?? old.markupPercent,
-        stockQty: data.stockQty ?? 0,
-        expiry: data.expiry ?? null,
-      },
+      data: updateData as any,
+      include: { prices: true },
     });
   },
 

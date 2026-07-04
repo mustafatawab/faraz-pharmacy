@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const priceTierSchema = z.object({
+  label: z.string().optional().default("Standard"),
+  purchasePrice: z.number(),
+  salePrice: z.number().optional(),
+});
+
 export const createProductSchema = z.object({
   barcode: z.string().min(1),
   name: z.string().min(1),
@@ -12,6 +18,7 @@ export const createProductSchema = z.object({
   markupPercent: z.number().optional().default(20),
   stockQty: z.number().int().optional().default(0),
   expiry: z.string().optional(),
+  prices: z.array(priceTierSchema).optional(),
 });
 
 export const updateProductSchema = createProductSchema;
