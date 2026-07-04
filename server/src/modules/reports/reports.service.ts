@@ -1,4 +1,5 @@
 import { prisma } from "../../services/prisma";
+import type { Prisma } from "../../generated/prisma/client";
 
 export const reportsService = {
   async getStats() {
@@ -59,17 +60,17 @@ export const reportsService = {
       totalArrears: totalArrears._sum.balanceDue ?? 0,
       lowStockCount,
       expiringSoonCount,
-      weekRevenue: weekRevenue.map((r) => ({
-        day: r.createdAt.toISOString().split("T")[0]!,
-        revenue: r._sum.total ?? 0,
+      weekRevenue: weekRevenue.map((r: Record<string, unknown>) => ({
+        day: (r.createdAt as Date).toISOString().split("T")[0]!,
+        revenue: (r._sum as Record<string, number>).total ?? 0,
       })),
-      monthRevenue: monthRevenue.map((r) => ({
-        day: r.createdAt.toISOString().split("T")[0]!,
-        revenue: r._sum.total ?? 0,
+      monthRevenue: monthRevenue.map((r: Record<string, unknown>) => ({
+        day: (r.createdAt as Date).toISOString().split("T")[0]!,
+        revenue: (r._sum as Record<string, number>).total ?? 0,
       })),
-      topProducts: topProducts.map((p) => ({
-        name: p.productName,
-        value: p._sum.quantity ?? 0,
+      topProducts: topProducts.map((p: Record<string, unknown>) => ({
+        name: p.productName as string,
+        value: (p._sum as Record<string, number>).quantity ?? 0,
       })),
     };
   },

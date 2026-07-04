@@ -6,154 +6,129 @@ import type {
 } from "@/types";
 import type { BackupResult, BackupEntry, GDriveConfig } from "@/types/electron";
 
-const cfg = () => window.appConfig;
-const base = () => `${cfg().serverUrl}`;
-const isClient = () => cfg().mode === "client";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-async function fetchJson<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${base()}${path}`, {
+function getToken(): string | null {
+  return localStorage.getItem("faraz_access_token");
+}
+
+async function fetchJson<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (auth) {
+    const token = getToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `API error: ${res.status}`);
+  }
   return res.json();
 }
 
 const api = {
+  auth: {
+    login: (username: string, password: string): Promise<{
+      accessToken: string; refreshToken: string; csrfToken: string;
+      user: { id: string; username: string; role: string };
+    }> =>
+      fetchJson("POST", "/api/auth/login", { username, password }, false),
+    refresh: (refreshToken: string): Promise<{
+      accessToken: string; refreshToken: string; csrfToken: string;
+      user: { id: string; username: string; role: string };
+    }> =>
+      fetchJson("POST", "/api/auth/refresh", { refreshToken }, false),
+    logout: (accessToken: string): Promise<{ success: boolean }> =>
+      fetchJson("POST", "/api/auth/logout", { accessToken }),
+    verifyPassword: (password: string): Promise<{ valid: boolean }> =>
+      fetchJson("POST", "/api/auth/verify-password", { password }, false),
+    generateRecoveryKey: (): Promise<{ phrase: string }> =>
+      fetchJson("POST", "/api/auth/generate-recovery-key", undefined, false),
+    recoverPassword: (phrase: string, newPassword: string): Promise<{ success: boolean; error?: string }> =>
+      fetchJson("POST", "/api/auth/recover-password", { phrase, newPassword }, false),
+  },
   products: {
-    list: (): Promise<Product[]> =>
-      isClient() ? fetchJson("GET", "/api/products") : window.electronAPI.products.list(),
-    search: (q: string): Promise<Product[]> =>
-      isClient() ? fetchJson("GET", `/api/products/search?q=${encodeURIComponent(q)}`) : window.electronAPI.products.search(q),
-    getByBarcode: (b: string): Promise<Product | null> =>
-      isClient() ? fetchJson("GET", `/api/products/barcode/${encodeURIComponent(b)}`) : window.electronAPI.products.getByBarcode(b),
-    create: (p: ProductInput): Promise<Product> =>
-      isClient() ? fetchJson("POST", "/api/products", p) : window.electronAPI.products.create(p),
-    update: (id: string, p: ProductInput): Promise<Product> =>
-      isClient() ? fetchJson("PUT", `/api/products/${id}`, p) : window.electronAPI.products.update(id, p),
-    delete: (id: string): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("DELETE", `/api/products/${id}`) : window.electronAPI.products.delete(id),
-    archive: (id: string): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("DELETE", `/api/products/${id}`) : window.electronAPI.products.archive(id),
-    restore: (id: string): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("POST", `/api/products/${id}/restore`) : window.electronAPI.products.restore(id),
-    listAll: (): Promise<Product[]> =>
-      isClient() ? fetchJson("GET", "/api/products?includeArchived=true") : window.electronAPI.products.listAll(),
+    list: (): Promise<Product[]> => fetchJson("GET", "/api/products"),
+    search: (q: string): Promise<Product[]> => fetchJson("GET", `/api/products/search?q=${encodeURIComponent(q)}`),
+    getByBarcode: (b: string): Promise<Product | null> => fetchJson("GET", `/api/products/barcode/${encodeURIComponent(b)}`),
+    create: (p: ProductInput): Promise<Product> => fetchJson("POST", "/api/products", p),
+    update: (id: string, p: ProductInput): Promise<Product> => fetchJson("PUT", `/api/products/${id}`, p),
+    delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/products/${id}`),
+    archive: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/products/${id}`),
+    restore: (id: string): Promise<{ success: boolean }> => fetchJson("POST", `/api/products/${id}/restore`),
+    listAll: (): Promise<Product[]> => fetchJson("GET", "/api/products?includeArchived=true"),
   },
   sales: {
-    create: (s: SaleInput): Promise<Sale> =>
-      isClient() ? fetchJson("POST", "/api/sales", s) : window.electronAPI.sales.create(s),
-    listRecent: (l = 10): Promise<Sale[]> =>
-      isClient() ? fetchJson("GET", `/api/sales/recent?limit=${l}`) : window.electronAPI.sales.listRecent(l),
-    getById: (id: string): Promise<Sale | null> =>
-      isClient() ? fetchJson("GET", `/api/sales/${id}`) : window.electronAPI.sales.getById(id),
-    listByDate: (dateStr: string): Promise<Sale[]> =>
-      isClient() ? fetchJson("GET", `/api/sales/date/${dateStr}`) : window.electronAPI.sales.listByDate(dateStr),
+    create: (s: SaleInput): Promise<Sale> => fetchJson("POST", "/api/sales", s),
+    listRecent: (l = 10): Promise<Sale[]> => fetchJson("GET", `/api/sales/recent?limit=${l}`),
+    getById: (id: string): Promise<Sale | null> => fetchJson("GET", `/api/sales/${id}`),
+    listByDate: (dateStr: string): Promise<Sale[]> => fetchJson("GET", `/api/sales/date/${dateStr}`),
     listAll: (opts?: { search?: string; dateFrom?: string; dateTo?: string }): Promise<Sale[]> => {
       const params = opts ? "?" + new URLSearchParams(Object.fromEntries(Object.entries(opts).filter(([_, v]) => v))).toString() : "";
-      return isClient() ? fetchJson("GET", `/api/sales${params}`) : window.electronAPI.sales.listAll(opts);
+      return fetchJson("GET", `/api/sales${params}`);
     },
   },
   customers: {
-    list: (): Promise<Customer[]> =>
-      isClient() ? fetchJson("GET", "/api/customers") : window.electronAPI.customers.list(),
-    search: (q: string): Promise<Customer[]> =>
-      isClient() ? fetchJson("GET", `/api/customers/search?q=${encodeURIComponent(q)}`) : window.electronAPI.customers.search(q),
-    create: (c: CustomerInput): Promise<Customer> =>
-      isClient() ? fetchJson("POST", "/api/customers", c) : window.electronAPI.customers.create(c),
-    update: (id: string, c: CustomerInput): Promise<Customer> =>
-      isClient() ? fetchJson("PUT", `/api/customers/${id}`, c) : window.electronAPI.customers.update(id, c),
+    list: (): Promise<Customer[]> => fetchJson("GET", "/api/customers"),
+    search: (q: string): Promise<Customer[]> => fetchJson("GET", `/api/customers/search?q=${encodeURIComponent(q)}`),
+    create: (c: CustomerInput): Promise<Customer> => fetchJson("POST", "/api/customers", c),
+    update: (id: string, c: CustomerInput): Promise<Customer> => fetchJson("PUT", `/api/customers/${id}`, c),
     delete: (id: string, opts?: { force?: boolean }): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("DELETE", `/api/customers/${id}${opts?.force ? "?force=true" : ""}`) : window.electronAPI.customers.delete(id, opts || {}),
-    getById: (id: string): Promise<Customer | null> =>
-      isClient() ? fetchJson("GET", `/api/customers/${id}`) : window.electronAPI.customers.getById(id),
+      fetchJson("DELETE", `/api/customers/${id}${opts?.force ? "?force=true" : ""}`),
+    getById: (id: string): Promise<Customer | null> => fetchJson("GET", `/api/customers/${id}`),
   },
   arrears: {
-    list: (status?: string): Promise<Arrear[]> =>
-      isClient() ? fetchJson("GET", `/api/arrears${status ? `?status=${status}` : ""}`) : window.electronAPI.arrears.list(status),
-    create: (a: ArrearInput): Promise<Arrear> =>
-      isClient() ? fetchJson("POST", "/api/arrears", a) : window.electronAPI.arrears.create(a),
-    recordPayment: (id: string, amount: number): Promise<Arrear> =>
-      isClient() ? fetchJson("POST", `/api/arrears/${id}/pay`, { amount }) : window.electronAPI.arrears.recordPayment(id, amount),
-    delete: (id: string): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("DELETE", `/api/arrears/${id}`) : window.electronAPI.arrears.delete(id),
-    settle: (id: string): Promise<Arrear> =>
-      isClient() ? fetchJson("POST", `/api/arrears/${id}/settle`) : window.electronAPI.arrears.settle(id),
+    list: (status?: string): Promise<Arrear[]> => fetchJson("GET", `/api/arrears${status ? `?status=${status}` : ""}`),
+    create: (a: ArrearInput): Promise<Arrear> => fetchJson("POST", "/api/arrears", a),
+    recordPayment: (id: string, amount: number): Promise<Arrear> => fetchJson("POST", `/api/arrears/${id}/pay`, { amount }),
+    delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/arrears/${id}`),
+    settle: (id: string): Promise<Arrear> => fetchJson("POST", `/api/arrears/${id}/settle`),
   },
   stock: {
-    list: (): Promise<StockPurchase[]> =>
-      isClient() ? fetchJson("GET", "/api/stock") : window.electronAPI.stock.list(),
-    create: (p: StockInput): Promise<StockPurchase> =>
-      isClient() ? fetchJson("POST", "/api/stock", p) : window.electronAPI.stock.create(p),
-    update: (id: string, p: StockInput): Promise<StockPurchase> =>
-      isClient() ? fetchJson("PUT", `/api/stock/${id}`, p) : window.electronAPI.stock.update(id, p),
+    list: (): Promise<StockPurchase[]> => fetchJson("GET", "/api/stock"),
+    create: (p: StockInput): Promise<StockPurchase> => fetchJson("POST", "/api/stock", p),
+    update: (id: string, p: StockInput): Promise<StockPurchase> => fetchJson("PUT", `/api/stock/${id}`, p),
   },
   distributors: {
-    list: (): Promise<Distributor[]> =>
-      isClient() ? fetchJson("GET", "/api/distributors") : window.electronAPI.distributors.list(),
-    create: (d: DistributorInput): Promise<Distributor> =>
-      isClient() ? fetchJson("POST", "/api/distributors", d) : window.electronAPI.distributors.create(d),
-    update: (id: string, d: DistributorInput): Promise<Distributor> =>
-      isClient() ? fetchJson("PUT", `/api/distributors/${id}`, d) : window.electronAPI.distributors.update(id, d),
-    delete: (id: string): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("DELETE", `/api/distributors/${id}`) : window.electronAPI.distributors.delete(id),
+    list: (): Promise<Distributor[]> => fetchJson("GET", "/api/distributors"),
+    create: (d: DistributorInput): Promise<Distributor> => fetchJson("POST", "/api/distributors", d),
+    update: (id: string, d: DistributorInput): Promise<Distributor> => fetchJson("PUT", `/api/distributors/${id}`, d),
+    delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/distributors/${id}`),
   },
   companies: {
-    list: (): Promise<Company[]> =>
-      isClient() ? fetchJson("GET", "/api/companies") : window.electronAPI.companies.list(),
-    create: (c: CompanyInput): Promise<Company> =>
-      isClient() ? fetchJson("POST", "/api/companies", c) : window.electronAPI.companies.create(c),
-    update: (id: string, c: CompanyInput): Promise<Company> =>
-      isClient() ? fetchJson("PUT", `/api/companies/${id}`, c) : window.electronAPI.companies.update(id, c),
-    delete: (id: string): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("DELETE", `/api/companies/${id}`) : window.electronAPI.companies.delete(id),
+    list: (): Promise<Company[]> => fetchJson("GET", "/api/companies"),
+    create: (c: CompanyInput): Promise<Company> => fetchJson("POST", "/api/companies", c),
+    update: (id: string, c: CompanyInput): Promise<Company> => fetchJson("PUT", `/api/companies/${id}`, c),
+    delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/companies/${id}`),
   },
   returns: {
-    list: (): Promise<ReturnEntry[]> =>
-      isClient() ? fetchJson("GET", "/api/returns") : window.electronAPI.returns.list(),
-    create: (r: ReturnInput): Promise<ReturnEntry> =>
-      isClient() ? fetchJson("POST", "/api/returns", r) : window.electronAPI.returns.create(r),
+    list: (): Promise<ReturnEntry[]> => fetchJson("GET", "/api/returns"),
+    create: (r: ReturnInput): Promise<ReturnEntry> => fetchJson("POST", "/api/returns", r),
   },
   expenses: {
-    list: (): Promise<Expense[]> =>
-      isClient() ? fetchJson("GET", "/api/expenses") : window.electronAPI.expenses.list(),
-    create: (e: ExpenseInput): Promise<Expense> =>
-      isClient() ? fetchJson("POST", "/api/expenses", e) : window.electronAPI.expenses.create(e),
-    update: (id: string, e: ExpenseInput): Promise<Expense> =>
-      isClient() ? fetchJson("PUT", `/api/expenses/${id}`, e) : window.electronAPI.expenses.update(id, e),
-    delete: (id: string): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("DELETE", `/api/expenses/${id}`) : window.electronAPI.expenses.delete(id),
-  },
-  auth: {
-    verifyPassword: (password: string): Promise<{ valid: boolean }> =>
-      isClient() ? fetchJson("POST", "/api/auth/verify-password", { password }) : window.verifyAdminPassword(password),
-    generateRecoveryKey: (): Promise<{ phrase: string }> =>
-      isClient() ? fetchJson("POST", "/api/auth/generate-recovery-key") : window.generateRecoveryKey(),
-    recoverPassword: (phrase: string, newPassword: string): Promise<{ success: boolean; error?: string }> =>
-      isClient() ? fetchJson("POST", "/api/auth/recover-password", { phrase, newPassword }) : window.recoverPassword(phrase, newPassword),
+    list: (): Promise<Expense[]> => fetchJson("GET", "/api/expenses"),
+    create: (e: ExpenseInput): Promise<Expense> => fetchJson("POST", "/api/expenses", e),
+    update: (id: string, e: ExpenseInput): Promise<Expense> => fetchJson("PUT", `/api/expenses/${id}`, e),
+    delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/expenses/${id}`),
   },
   dashboard: {
-    stats: (): Promise<DashboardStats> =>
-      isClient() ? fetchJson("GET", "/api/dashboard/stats") : window.electronAPI.dashboard.stats(),
+    stats: (): Promise<DashboardStats> => fetchJson("GET", "/api/dashboard/stats"),
   },
   settings: {
-    backupCreate: (): Promise<BackupResult> =>
-      isClient() ? fetchJson("POST", "/api/settings/backup") : window.electronAPI.settings.backupCreate(),
-    backupList: (): Promise<BackupEntry[]> =>
-      isClient() ? fetchJson("GET", "/api/settings/backups") : window.electronAPI.settings.backupList(),
+    backupCreate: (): Promise<BackupResult> => fetchJson("POST", "/api/settings/backup"),
+    backupList: (): Promise<BackupEntry[]> => fetchJson("GET", "/api/settings/backups"),
     backupDelete: (name: string): Promise<{ success: boolean; error?: string }> =>
-      isClient() ? fetchJson("DELETE", "/api/settings/backup", { name }) : window.electronAPI.settings.backupDelete(name),
+      fetchJson("DELETE", "/api/settings/backup", { name }),
     backupRestore: (name: string): Promise<{ success: boolean; error?: string }> =>
-      isClient() ? fetchJson("POST", "/api/settings/backup/restore", { name }) : window.electronAPI.settings.backupRestore(name),
-    backupDirectoryPick: (): Promise<{ canceled: boolean; path?: string }> =>
-      isClient() ? fetchJson("POST", "/api/settings/backup/directory-pick") : window.electronAPI.settings.backupDirectoryPick(),
-    getBackupDirectory: (): Promise<{ path: string }> =>
-      isClient() ? fetchJson("GET", "/api/settings/backup/directory") : window.electronAPI.settings.getBackupDirectory(),
-    gdriveGetConfig: (): Promise<GDriveConfig> =>
-      isClient() ? fetchJson("GET", "/api/settings/gdrive") : window.electronAPI.settings.gdriveGetConfig(),
+      fetchJson("POST", "/api/settings/backup/restore", { name }),
+    getBackupDirectory: (): Promise<{ path: string }> => fetchJson("GET", "/api/settings/backup/directory"),
+    gdriveGetConfig: (): Promise<GDriveConfig> => fetchJson("GET", "/api/settings/gdrive"),
     gdriveSaveConfig: (cfg: GDriveConfig): Promise<{ success: boolean }> =>
-      isClient() ? fetchJson("PUT", "/api/settings/gdrive", cfg) : window.electronAPI.settings.gdriveSaveConfig(cfg),
+      fetchJson("PUT", "/api/settings/gdrive", cfg),
   },
 };
 

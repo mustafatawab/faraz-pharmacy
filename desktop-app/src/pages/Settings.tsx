@@ -139,13 +139,6 @@ export default function Settings() {
     }
   }
 
-  async function handlePickDirectory() {
-    const res = await api.settings.backupDirectoryPick();
-    if (!res.canceled && res.path) {
-      setBackupDirectory(res.path);
-    }
-  }
-
   async function handlePasswordConfirmed() {
     setPasswordError("");
     const ok = await verifyAdminPassword(adminPassword);
@@ -299,7 +292,7 @@ export default function Settings() {
                     readOnly
                     className="flex-1 font-mono text-sm"
                   />
-                  <Button variant="outline" onClick={handlePickDirectory} className="gap-2 shrink-0">
+                  <Button variant="outline" disabled className="gap-2 shrink-0">
                     <FolderOpen className="h-4 w-4" />
                     Change
                   </Button>

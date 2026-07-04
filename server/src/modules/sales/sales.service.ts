@@ -2,6 +2,7 @@ import { prisma } from "../../services/prisma";
 import { NotFoundError } from "../../utils/errors";
 import { emitEvent } from "../../socket";
 import type { CreateSaleInput } from "./sales.schema";
+import { Prisma } from "../../generated/prisma/client";
 
 export const salesService = {
   async create(data: CreateSaleInput) {
@@ -21,7 +22,7 @@ export const salesService = {
     }
     const saleId = `${prefix}${nextNum.toString().padStart(6, "0")}`;
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const sale = await tx.sale.create({
         data: {
           id: saleId,

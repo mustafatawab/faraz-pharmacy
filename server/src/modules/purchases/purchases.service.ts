@@ -2,6 +2,7 @@ import { prisma } from "../../services/prisma";
 import { NotFoundError } from "../../utils/errors";
 import { emitEvent } from "../../socket";
 import type { CreateStockInput } from "./purchases.schema";
+import { Prisma } from "../../generated/prisma/client";
 
 export const purchasesService = {
   async list() {
@@ -25,7 +26,7 @@ export const purchasesService = {
     const salePrice = product?.salePrice ?? 0;
     const totalValue = data.quantity * price;
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const stockPurchase = await tx.stockPurchase.create({
         data: {
           productId: data.productId,
@@ -65,7 +66,7 @@ export const purchasesService = {
     const qtyDiff = (data.quantity ?? old.quantity) - old.quantity;
     const totalValue = (data.quantity ?? old.quantity) * old.purchasePrice;
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updated = await tx.stockPurchase.update({
         where: { id },
         data: {

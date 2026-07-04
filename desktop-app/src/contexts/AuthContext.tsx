@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { api } from "@/lib/api";
 
 interface User {
   id: string;
@@ -10,7 +11,6 @@ interface AuthState {
   user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
-  csrfToken: string | null;
 }
 
 interface AuthContextType extends AuthState {
@@ -21,57 +21,47 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const ACCESS_COOKIE = "faraz_access_token";
-const REFRESH_COOKIE = "faraz_refresh_token";
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
+function loadTokens() {
+  return {
+    accessToken: localStorage.getItem("faraz_access_token"),
+    refreshToken: localStorage.getItem("faraz_refresh_token"),
+  };
 }
 
-function setCookie(name: string, value: string, days: number) {
-  const expires = new Date(Date.now() + days * 86400000).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Strict`;
+function saveTokens(accessToken: string | null, refreshToken: string | null) {
+  if (accessToken) localStorage.setItem("faraz_access_token", accessToken);
+  else localStorage.removeItem("faraz_access_token");
+  if (refreshToken) localStorage.setItem("faraz_refresh_token", refreshToken);
+  else localStorage.removeItem("faraz_refresh_token");
 }
 
-function removeCookie(name: string) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`;
-}
-
-function nully<T>(val: T | null | undefined): T | null {
-  return val ?? null;
+function clearTokens() {
+  localStorage.removeItem("faraz_access_token");
+  localStorage.removeItem("faraz_refresh_token");
+  localStorage.removeItem("faraz_user");
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(() => {
-    const accessToken = getCookie(ACCESS_COOKIE);
-    const refreshToken = getCookie(REFRESH_COOKIE);
-    return { user: null, accessToken, refreshToken, csrfToken: null };
+    const tokens = loadTokens();
+    const userStr = localStorage.getItem("faraz_user");
+    const user = userStr ? JSON.parse(userStr) : null;
+    return { user, ...tokens };
   });
 
   const refreshAccessToken = useCallback(async () => {
-    const stored = getCookie(REFRESH_COOKIE);
+    const stored = loadTokens().refreshToken;
     if (!stored) return false;
 
     try {
-      const res = await window.authRefresh({ refreshToken: stored });
-      if (res.error) {
-        removeCookie(ACCESS_COOKIE);
-        removeCookie(REFRESH_COOKIE);
-        return false;
-      }
-      setState((prev) => ({
-        ...prev,
-        user: nully(res.user),
-        accessToken: nully(res.accessToken),
-        csrfToken: nully(res.csrfToken),
-        refreshToken: stored,
-      }));
-      if (res.accessToken) setCookie(ACCESS_COOKIE, res.accessToken, 1);
+      const res = await api.auth.refresh(stored);
+      saveTokens(res.accessToken, res.refreshToken);
+      localStorage.setItem("faraz_user", JSON.stringify(res.user));
+      setState({ user: res.user, accessToken: res.accessToken, refreshToken: res.refreshToken });
       return true;
     } catch {
-      removeCookie(ACCESS_COOKIE);
-      removeCookie(REFRESH_COOKIE);
+      clearTokens();
+      setState({ user: null, accessToken: null, refreshToken: null });
       return false;
     }
   }, []);
@@ -86,23 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const interval = setInterval(async () => {
       try {
-        const res = await window.authRefresh({ refreshToken: state.refreshToken });
-        if (res.error) {
-          setState({ user: null, accessToken: null, refreshToken: null, csrfToken: null });
-          removeCookie(ACCESS_COOKIE);
-          removeCookie(REFRESH_COOKIE);
-          return;
-        }
-        setState((prev) => ({
-          ...prev,
-          accessToken: nully(res.accessToken),
-          csrfToken: nully(res.csrfToken),
-        }));
-        if (res.accessToken) setCookie(ACCESS_COOKIE, res.accessToken, 1);
+        const res = await api.auth.refresh(state.refreshToken!);
+        saveTokens(res.accessToken, res.refreshToken);
+        localStorage.setItem("faraz_user", JSON.stringify(res.user));
+        setState((prev) => ({ ...prev, accessToken: res.accessToken }));
       } catch {
-        setState({ user: null, accessToken: null, refreshToken: null, csrfToken: null });
-        removeCookie(ACCESS_COOKIE);
-        removeCookie(REFRESH_COOKIE);
+        clearTokens();
+        setState({ user: null, accessToken: null, refreshToken: null });
       }
     }, 10 * 60 * 1000);
 
@@ -111,32 +91,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string): Promise<string | null> => {
     try {
-      const res = await window.authLogin({ username, password });
-      if (res.error) return res.error;
-      setState({
-        user: nully(res.user),
-        accessToken: nully(res.accessToken),
-        refreshToken: nully(res.refreshToken),
-        csrfToken: nully(res.csrfToken),
-      });
-      if (res.accessToken) setCookie(ACCESS_COOKIE, res.accessToken, 1);
-      if (res.refreshToken) setCookie(REFRESH_COOKIE, res.refreshToken, 30);
+      const res = await api.auth.login(username, password);
+      saveTokens(res.accessToken, res.refreshToken);
+      localStorage.setItem("faraz_user", JSON.stringify(res.user));
+      setState({ user: res.user, accessToken: res.accessToken, refreshToken: res.refreshToken });
       return null;
-    } catch {
-      return "Login failed";
+    } catch (err) {
+      return err instanceof Error ? err.message : "Login failed";
     }
   };
 
   const logout = async () => {
     try {
       if (state.accessToken) {
-        await window.authLogout({ accessToken: state.accessToken });
+        await api.auth.logout(state.accessToken);
       }
     } catch {}
-    setState({ user: null, accessToken: null, refreshToken: null, csrfToken: null });
-    removeCookie(ACCESS_COOKIE);
-    removeCookie(REFRESH_COOKIE);
-    localStorage.setItem("faraz_show_setup", "true");
+    clearTokens();
+    setState({ user: null, accessToken: null, refreshToken: null });
   };
 
   return (

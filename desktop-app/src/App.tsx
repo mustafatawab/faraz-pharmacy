@@ -24,13 +24,19 @@ import Settings from "@/pages/Settings";
 function AppShell() {
   const { isAuthenticated } = useAuth();
   const [ready, setReady] = useState(false);
-  const [configured, setConfigured] = useState(false);
+  const [configured, setConfigured] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
   const prevAuth = useRef(isAuthenticated);
 
   useEffect(() => {
-    const cfg = window.appConfig;
-    setConfigured(cfg?.mode === "server" || cfg?.mode === "client");
+    try {
+      const cfg = window.appConfig;
+      if (cfg) {
+        setConfigured(cfg.mode === "server" || cfg.mode === "client");
+      }
+    } catch {
+      // Running outside Electron (e.g. browser dev mode) — skip config check
+    }
     if (localStorage.getItem("faraz_show_setup") === "true") {
       setShowSetup(true);
     }
@@ -48,17 +54,6 @@ function AppShell() {
 
   if (!configured || showSetup) {
     return <FirstLaunch onComplete={() => { localStorage.removeItem("faraz_show_setup"); window.location.reload(); }} />;
-  }
-
-  if (window.appConfig.mode === "client" && !window.appConfig.serverUrl) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background p-4">
-        <div className="text-center max-w-sm">
-          <h2 className="text-lg font-semibold text-text-primary mb-2">Not Configured</h2>
-          <p className="text-sm text-text-secondary">Server URL is missing. Please delete the config file and restart.</p>
-        </div>
-      </div>
-    );
   }
 
   if (!isAuthenticated) {

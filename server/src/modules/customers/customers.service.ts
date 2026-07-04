@@ -1,6 +1,7 @@
 import { prisma } from "../../services/prisma";
 import { NotFoundError, BadRequestError } from "../../utils/errors";
 import type { CreateCustomerInput } from "./customers.schema";
+import { Prisma } from "../../generated/prisma/client";
 
 export const customersService = {
   async list() {
@@ -71,7 +72,7 @@ export const customersService = {
       );
     }
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (force) {
         await tx.sale.updateMany({ where: { customerId: id }, data: { customerId: null } });
         await tx.arrear.deleteMany({ where: { customerId: id } });

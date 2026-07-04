@@ -29,4 +29,25 @@ export const authController = {
       res.json(result);
     } catch (err) { next(err); }
   },
+
+  async refresh(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.refresh(req.body.refreshToken);
+      res.json(result);
+    } catch (err) { next(err); }
+  },
+
+  async logout(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.logout(req.body.accessToken);
+      res.json(result);
+    } catch (err) { next(err); }
+  },
+
+  async me(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.me(req.user!.userId);
+      res.json(result);
+    } catch (err) { next(err); }
+  },
 };

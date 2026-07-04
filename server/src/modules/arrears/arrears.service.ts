@@ -1,5 +1,6 @@
 import { prisma } from "../../services/prisma";
 import { NotFoundError } from "../../utils/errors";
+import { Prisma } from "../../generated/prisma/client";
 
 export const arrearsService = {
   async list(status?: string) {
@@ -34,7 +35,7 @@ export const arrearsService = {
     const newBalance = Math.max(0, arrear.totalBill - newPaid);
     const newStatus = newBalance <= 0 ? "settled" : "pending";
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updated = await tx.arrear.update({
         where: { id },
         data: { amountPaid: newPaid, balanceDue: newBalance, status: newStatus },
@@ -53,7 +54,7 @@ export const arrearsService = {
     const arrear = await prisma.arrear.findUnique({ where: { id } });
     if (!arrear) throw new NotFoundError("Arrear");
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updated = await tx.arrear.update({
         where: { id },
         data: { amountPaid: arrear.totalBill, balanceDue: 0, status: "settled" },

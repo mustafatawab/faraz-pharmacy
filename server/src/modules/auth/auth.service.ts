@@ -114,4 +114,47 @@ export const authService = {
 
     return { success: true };
   },
+
+  async refresh(refreshToken: string) {
+    const token = await prisma.authToken.findUnique({
+      where: { refreshToken },
+      include: { user: true },
+    });
+
+    if (!token || token.refreshExpiresAt < new Date()) {
+      throw new UnauthorizedError("Invalid or expired refresh token");
+    }
+
+    const newAccessToken = jwt.sign(
+      { userId: token.user.id, username: token.user.username, role: token.user.role },
+      config.jwtSecret,
+      { expiresIn: "24h" },
+    );
+
+    const newCsrfToken = crypto.randomUUID();
+    const newExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await prisma.authToken.update({
+      where: { id: token.id },
+      data: { accessToken: newAccessToken, csrfToken: newCsrfToken, accessExpiresAt: newExpiresAt },
+    });
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: token.refreshToken,
+      csrfToken: newCsrfToken,
+      user: { id: token.user.id, username: token.user.username, role: token.user.role },
+    };
+  },
+
+  async logout(accessToken: string) {
+    await prisma.authToken.deleteMany({ where: { accessToken } });
+    return { success: true };
+  },
+
+  async me(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedError("User not found");
+    return { id: user.id, username: user.username, role: user.role };
+  },
 };

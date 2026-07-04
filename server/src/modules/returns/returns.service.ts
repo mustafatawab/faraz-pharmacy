@@ -2,6 +2,7 @@ import { prisma } from "../../services/prisma";
 import { BadRequestError } from "../../utils/errors";
 import { emitEvent } from "../../socket";
 import type { CreateReturnInput } from "./returns.schema";
+import { Prisma } from "../../generated/prisma/client";
 
 export const returnsService = {
   async list() {
@@ -14,7 +15,7 @@ export const returnsService = {
     const existing = await prisma.returnEntry.findFirst({ where: { saleId: data.saleId } });
     if (existing) throw new BadRequestError("This sale has already been returned");
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const returnEntry = await tx.returnEntry.create({
         data: {
           saleId: data.saleId,
