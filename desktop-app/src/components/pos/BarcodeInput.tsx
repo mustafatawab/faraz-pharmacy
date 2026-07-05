@@ -10,7 +10,7 @@ interface BarcodeInputProps {
 export default function BarcodeInput({ value, onChange, onSubmit }: BarcodeInputProps) {
   return (
     <div className="relative">
-      <Barcode className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-text-secondary" />
+      <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -21,9 +21,9 @@ export default function BarcodeInput({ value, onChange, onSubmit }: BarcodeInput
           }
         }}
         placeholder="Search by name or scan barcode..."
-        className="h-12 pl-11 pr-4 text-base rounded-xl bg-surface border-border"
+        className="h-10 pl-9 pr-9 text-sm rounded-lg"
       />
-      <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary" />
     </div>
   );
 }

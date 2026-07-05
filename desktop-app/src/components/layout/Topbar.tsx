@@ -1,31 +1,33 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { Server, WifiOff, LogOut } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { motion } from "framer-motion";
+import { Server, Monitor, Sun, Moon, Search, Bell } from "lucide-react";
 
-const pageTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/pos": "POS / Sales",
-  "/products": "Products",
-  "/stock": "Stock",
-  "/customers": "Customers",
-  "/arrears": "Arrears",
-  "/distributors": "Distributors",
-  "/companies": "Companies",
-  "/returns": "Returns",
-  "/expenses": "Expenses",
-  "/reports": "Reports",
+const pageLabels: Record<string, { title: string; subtitle: string }> = {
+  "/dashboard": { title: "Dashboard", subtitle: "Business overview" },
+  "/pos": { title: "Point of Sale", subtitle: "Create and manage sales" },
+  "/products": { title: "Products", subtitle: "Inventory management" },
+  "/stock": { title: "Stock", subtitle: "Purchase management" },
+  "/customers": { title: "Customers", subtitle: "Customer records" },
+  "/invoices": { title: "Invoices", subtitle: "Sales invoices" },
+  "/arrears": { title: "Arrears", subtitle: "Outstanding payments" },
+  "/distributors": { title: "Distributors", subtitle: "Supplier management" },
+  "/companies": { title: "Companies", subtitle: "Company records" },
+  "/returns": { title: "Returns", subtitle: "Return management" },
+  "/expenses": { title: "Expenses", subtitle: "Expense tracking" },
+  "/reports": { title: "Reports", subtitle: "Business insights" },
+  "/settings": { title: "Settings", subtitle: "System configuration" },
 };
 
 export default function Topbar() {
   const location = useLocation();
-  const { logout, user } = useAuth();
   const [time, setTime] = useState("");
+  const [dark, setDark] = useState(false);
 
   useEffect(() => {
     const update = () => {
       setTime(new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true,
+        hour: "2-digit", minute: "2-digit", hour12: true,
       }));
     };
     update();
@@ -33,45 +35,54 @@ export default function Topbar() {
     return () => clearInterval(interval);
   }, []);
 
-  const pathParts = location.pathname.split("/").filter(Boolean);
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  function toggleDark() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    try { localStorage.setItem("faraz_theme", next ? "dark" : "light"); } catch {}
+  }
+
+  const page = pageLabels[location.pathname] || { title: "Dashboard", subtitle: "Business overview" };
   const isServer = window.appConfig?.mode === "server";
-  const isClient = window.appConfig?.mode === "client";
 
   return (
-    <header className="h-16 border-b border-border bg-surface/80 backdrop-blur-sm sticky top-0 z-30">
-      <div className="flex items-center justify-between h-full px-6">
-        <div className="flex items-center gap-2 text-sm">
-          {pathParts.map((part, i) => (
-            <span key={part} className="flex items-center gap-2">
-              {i > 0 && <span className="text-text-secondary">/</span>}
-              <span className={i === pathParts.length - 1 ? "text-text-primary font-medium" : "text-text-secondary"}>
-                {pageTitles["/" + part] || part.charAt(0).toUpperCase() + part.slice(1)}
-              </span>
-            </span>
-          ))}
-          {pathParts.length === 0 && <span className="text-text-primary font-medium">Dashboard</span>}
-        </div>
-        <div className="flex items-center gap-3">
-          {isServer && (
-            <div className="flex items-center gap-1.5 text-xs text-success bg-success/5 px-2.5 py-1 rounded-full border border-success/20">
-              <Server className="h-3 w-3" />
-              Server
-            </div>
-          )}
-          {isClient && (
-            <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-surface-2 px-2.5 py-1 rounded-full border border-border">
-              <WifiOff className="h-3 w-3" />
-              Client
-            </div>
-          )}
-          <span className="text-sm text-text-secondary">{user?.username}</span>
-          <div className="text-sm tabular-nums text-text-secondary font-mono">{time}</div>
+    <header className="h-12 border-b border-border bg-surface/70 backdrop-blur-lg sticky top-0 z-30">
+      <div className="flex items-center justify-between h-full px-5">
+        <motion.div
+          key={location.pathname}
+          initial={{ opacity: 0, x: -4 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          <h1 className="text-sm font-semibold text-text-primary tracking-tight">{page.title}</h1>
+          <p className="text-[10px] text-text-secondary leading-none mt-px">{page.subtitle}</p>
+        </motion.div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-2 h-6 rounded-md bg-muted text-[10px] text-text-secondary font-medium">
+            {isServer ? (
+              <Server className="h-3 w-3 text-accent" />
+            ) : (
+              <Monitor className="h-3 w-3 text-muted-foreground" />
+            )}
+            <span>{isServer ? "Server" : "Client"}</span>
+          </div>
+
+          <span className="text-[11px] text-text-secondary tabular-nums font-medium">{time}</span>
+
+          <button className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted transition-all duration-150">
+            <Bell className="h-3.5 w-3.5" />
+          </button>
+
           <button
-            onClick={logout}
-            className="h-8 w-8 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors"
-            title="Sign out"
+            onClick={toggleDark}
+            className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted transition-all duration-150"
           >
-            <LogOut className="h-4 w-4" />
+            {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>

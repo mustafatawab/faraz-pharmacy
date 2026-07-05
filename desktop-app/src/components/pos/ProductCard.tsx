@@ -15,29 +15,29 @@ export default function ProductCard({ product, onAdd }: ProductCardProps) {
 
   return (
     <motion.button
-      whileHover={outOfStock ? undefined : { scale: 1.02 }}
-      whileTap={outOfStock ? undefined : { scale: 0.98 }}
+      whileHover={outOfStock ? undefined : { y: -1 }}
+      whileTap={outOfStock ? undefined : { scale: 0.99 }}
       onClick={() => !outOfStock && onAdd(product)}
       disabled={outOfStock}
-      className={`w-full text-left rounded-xl border bg-surface p-4 transition-all ${
+      className={`w-full text-left rounded-lg border bg-surface p-3.5 transition-all ${
         outOfStock
-          ? "border-danger/50 opacity-60 cursor-not-allowed"
-          : "border-border hover:border-accent/30 hover:shadow-md cursor-pointer"
+          ? "border-danger/30 opacity-50 cursor-not-allowed"
+          : "border-border hover:border-accent/30 hover:shadow-sm cursor-pointer"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-text-primary text-sm truncate">{product.name}</h3>
-          <p className="text-xs text-text-secondary mt-0.5 truncate">{product.company}</p>
+          <h3 className="font-medium text-text-primary text-xs truncate">{product.name}</h3>
+          <p className="text-[10px] text-text-secondary mt-px truncate">{product.company}</p>
         </div>
-        <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-          <Package className="h-4 w-4 text-accent" />
+        <div className="h-7 w-7 rounded-md bg-accent/10 flex items-center justify-center shrink-0">
+          <Package className="h-3.5 w-3.5 text-accent" />
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-base font-bold text-text-primary">{formatCurrency(product.sale_price)}</span>
-        <Badge variant={outOfStock ? "danger" : lowStock ? "danger" : "outline"} className="text-[10px] px-1.5 py-0">
-          {outOfStock ? "Out of stock" : `${product.stock_qty} in stock`}
+      <div className="mt-2.5 flex items-center justify-between">
+        <span className="text-sm font-bold text-text-primary tabular-nums">{formatCurrency(product.sale_price)}</span>
+        <Badge variant={outOfStock ? "danger" : lowStock ? "danger" : "neutral"} className="text-[9px] px-1.5 py-px">
+          {outOfStock ? "Out" : `${product.stock_qty}`}
         </Badge>
       </div>
     </motion.button>

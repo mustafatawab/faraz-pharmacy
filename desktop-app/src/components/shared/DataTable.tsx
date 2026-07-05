@@ -1,6 +1,4 @@
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +34,7 @@ export default function DataTable<T>({ columns, data, loading, keyExtractor, onR
             <TableRow key={i}>
               {columns.map((col) => (
                 <TableCell key={col.key}>
-                  <Skeleton className="h-5 w-full max-w-[120px]" />
+                  <Skeleton className="h-4 w-full max-w-[100px]" />
                 </TableCell>
               ))}
             </TableRow>
@@ -58,7 +56,7 @@ export default function DataTable<T>({ columns, data, loading, keyExtractor, onR
       <TableBody>
         {data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={columns.length} className="text-center text-text-secondary py-8">
+            <TableCell colSpan={columns.length} className="text-center text-text-secondary py-10 text-xs">
               {emptyMessage || "No data found"}
             </TableCell>
           </TableRow>

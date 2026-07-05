@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/layout/Sidebar";
@@ -21,12 +22,27 @@ import Reports from "@/pages/Reports";
 import Invoices from "@/pages/Invoices";
 import Settings from "@/pages/Settings";
 
+const pageVariants = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.15, ease: "easeIn" } },
+} as const;
+
+function AnimatedPage({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit">
+      {children}
+    </motion.div>
+  );
+}
+
 function AppShell() {
   const { isAuthenticated } = useAuth();
   const [ready, setReady] = useState(false);
   const [configured, setConfigured] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
   const prevAuth = useRef(isAuthenticated);
+  const location = useLocation();
 
   useEffect(() => {
     try {
@@ -34,9 +50,7 @@ function AppShell() {
       if (cfg) {
         setConfigured(cfg.mode === "server" || cfg.mode === "client");
       }
-    } catch {
-      // Running outside Electron (e.g. browser dev mode) — skip config check
-    }
+    } catch {}
     if (localStorage.getItem("faraz_show_setup") === "true") {
       setShowSetup(true);
     }
@@ -61,28 +75,30 @@ function AppShell() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/pos" element={<POS />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/customers/:id" element={<CustomerDetail />} />
-            <Route path="/arrears" element={<Arrears />} />
-            <Route path="/stock" element={<Stock />} />
-            <Route path="/distributors" element={<Distributors />} />
-            <Route path="/companies" element={<Companies />} />
-            <Route path="/returns" element={<Returns />} />
-            <Route path="/expenses" element={<Expenses />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/invoices" element={<Invoices />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+        <main className="flex-1 overflow-y-auto p-5 lg:p-6">
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<AnimatedPage><Dashboard /></AnimatedPage>} />
+              <Route path="/pos" element={<AnimatedPage><POS /></AnimatedPage>} />
+              <Route path="/products" element={<AnimatedPage><Products /></AnimatedPage>} />
+              <Route path="/customers" element={<AnimatedPage><Customers /></AnimatedPage>} />
+              <Route path="/customers/:id" element={<AnimatedPage><CustomerDetail /></AnimatedPage>} />
+              <Route path="/arrears" element={<AnimatedPage><Arrears /></AnimatedPage>} />
+              <Route path="/stock" element={<AnimatedPage><Stock /></AnimatedPage>} />
+              <Route path="/distributors" element={<AnimatedPage><Distributors /></AnimatedPage>} />
+              <Route path="/companies" element={<AnimatedPage><Companies /></AnimatedPage>} />
+              <Route path="/returns" element={<AnimatedPage><Returns /></AnimatedPage>} />
+              <Route path="/expenses" element={<AnimatedPage><Expenses /></AnimatedPage>} />
+              <Route path="/reports" element={<AnimatedPage><Reports /></AnimatedPage>} />
+              <Route path="/invoices" element={<AnimatedPage><Invoices /></AnimatedPage>} />
+              <Route path="/settings" element={<AnimatedPage><Settings /></AnimatedPage>} />
+            </Routes>
+          </AnimatePresence>
         </main>
       </div>
     </div>
@@ -93,7 +109,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppShell />
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" closeButton />
     </AuthProvider>
   );
 }

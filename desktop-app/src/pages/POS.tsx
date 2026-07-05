@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import type { Product, PrinterConfig, ProductPrice } from "@/types";
 
@@ -205,16 +206,16 @@ export default function POS() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
+    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-7rem)]">
       <div className="flex-1 flex flex-col min-h-0">
         <BarcodeInput value={search} onChange={setSearch} onSubmit={handleBarcodeSubmit} />
-        <div className="flex-1 overflow-y-auto mt-4">
+        <div className="flex-1 overflow-y-auto mt-3">
           {displayProducts.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-sm text-text-secondary">
+            <div className="flex items-center justify-center h-full text-xs text-text-secondary">
               {search ? "No products found" : "Search or scan a product to begin"}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
               <AnimatePresence mode="popLayout">
                 {displayProducts.slice(0, 50).map((product: Product) => (
                   <motion.div
@@ -223,7 +224,7 @@ export default function POS() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: 0.12 }}
                   >
                     <ProductCard product={product} onAdd={handleAddProduct} />
                   </motion.div>
@@ -233,8 +234,8 @@ export default function POS() {
           )}
         </div>
       </div>
-      <div className="w-full lg:w-[400px] xl:w-[440px] shrink-0">
-        <div className="lg:sticky lg:top-20 bg-surface border border-border rounded-xl p-5 h-full max-h-[calc(100vh-10rem)] flex flex-col">
+      <div className="w-full lg:w-[380px] xl:w-[400px] shrink-0">
+        <div className="lg:sticky lg:top-16 bg-surface border border-border rounded-lg p-4 h-full max-h-[calc(100vh-7.5rem)] flex flex-col">
           <CheckoutPanel
             items={cart.items}
             discount={cart.discount}
@@ -263,22 +264,22 @@ export default function POS() {
               {pendingProduct?.name ?? "Product"} has multiple price tiers. Choose one to add to cart.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2 py-2">
+          <div className="space-y-2 py-3 px-5">
             <button
               onClick={() => pendingProduct && handleTierSelect(pendingProduct.sale_price ?? 0)}
-              className="w-full text-left p-3 rounded-lg border-2 border-border hover:border-accent/50 transition-colors flex items-center justify-between"
+              className="w-full text-left p-2.5 rounded-lg border border-border hover:border-accent/50 transition-colors flex items-center justify-between"
             >
-              <span className="font-medium">Standard</span>
-              <span className="font-mono font-bold text-accent">{formatCurrency(pendingProduct?.sale_price ?? 0)}</span>
+              <span className="text-xs font-medium">Standard</span>
+              <span className="font-mono font-bold text-accent text-xs">{formatCurrency(pendingProduct?.sale_price ?? 0)}</span>
             </button>
             {pendingPrices?.map((tier) => (
               <button
                 key={tier.id}
                 onClick={() => handleTierSelect(tier.salePrice)}
-                className="w-full text-left p-3 rounded-lg border-2 border-border hover:border-accent/50 transition-colors flex items-center justify-between"
+                className="w-full text-left p-2.5 rounded-lg border border-border hover:border-accent/50 transition-colors flex items-center justify-between"
               >
-                <span className="font-medium">{tier.label || "Untitled"}</span>
-                <span className="font-mono font-bold text-accent">{formatCurrency(tier.salePrice)}</span>
+                <span className="text-xs font-medium">{tier.label || "Untitled"}</span>
+                <span className="font-mono font-bold text-accent text-xs">{formatCurrency(tier.salePrice)}</span>
               </button>
             ))}
           </div>
@@ -294,22 +295,22 @@ export default function POS() {
             <AlertDialogTitle>Print Receipt</AlertDialogTitle>
             <AlertDialogDescription>Select paper size and printer</AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 px-5">
             <div className="space-y-2">
-              <Label>Paper Size</Label>
+              <Label className="text-xs">Paper Size</Label>
               <div className="grid grid-cols-3 gap-2">
                 {PAPER_SIZES.map(({ value, label, icon: Icon }) => (
                   <button
                     key={value}
                     onClick={() => setPrinterConfig({ ...printerConfig, paperSize: value as "thermal" | "a4" | "a5" })}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-colors ${
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-lg border transition-colors ${
                       printerConfig.paperSize === value
                         ? "border-accent bg-accent/5"
                         : "border-border hover:border-accent/50"
                     }`}
                   >
-                    <Icon className={`h-5 w-5 ${printerConfig.paperSize === value ? "text-accent" : "text-text-secondary"}`} />
-                    <span className={`text-xs font-medium ${printerConfig.paperSize === value ? "text-accent" : "text-text-secondary"}`}>
+                    <Icon className={`h-4 w-4 ${printerConfig.paperSize === value ? "text-accent" : "text-text-secondary"}`} />
+                    <span className={`text-[10px] font-medium ${printerConfig.paperSize === value ? "text-accent" : "text-text-secondary"}`}>
                       {label}
                     </span>
                   </button>
@@ -317,7 +318,7 @@ export default function POS() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Printer</Label>
+              <Label className="text-xs">Printer</Label>
               <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Default printer" />
@@ -334,9 +335,9 @@ export default function POS() {
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handlePrintNo}>Don't Print</AlertDialogCancel>
+            <AlertDialogCancel onClick={handlePrintNo} size="sm">Don't Print</AlertDialogCancel>
             <div className="flex gap-2">
-              <AlertDialogAction onClick={() => { handleSavePrinterPref(); handlePrintYes(); }}>
+              <AlertDialogAction onClick={() => { handleSavePrinterPref(); handlePrintYes(); }} size="sm">
                 Print
               </AlertDialogAction>
             </div>

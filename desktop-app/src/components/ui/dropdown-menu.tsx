@@ -17,7 +17,7 @@ const DropdownMenuContent = React.forwardRef<
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
-      className={cn("z-50 min-w-[8rem] overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-lg animate-in animate-fade-in animate-zoom-in-95", className)}
+      className={cn("z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg animate-in animate-fade-in animate-zoom-in-95", className)}
       {...props}
     />
   </DropdownMenuPrimitive.Portal>
@@ -30,7 +30,7 @@ const DropdownMenuItem = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
-    className={cn("relative flex cursor-default select-none items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors focus:bg-surface-2 focus:text-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50", inset && "pl-8", className)}
+    className={cn("relative flex cursor-default select-none items-center rounded-md px-2.5 py-1.5 text-xs outline-none transition-colors focus:bg-surface-2 focus:text-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50", inset && "pl-8", className)}
     {...props}
   />
 ));
@@ -48,7 +48,7 @@ const DropdownMenuLabel = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Label>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & { inset?: boolean }
 >(({ className, inset, ...props }, ref) => (
-  <DropdownMenuPrimitive.Label ref={ref} className={cn("px-3 py-2 text-sm font-semibold", inset && "pl-8", className)} {...props} />
+  <DropdownMenuPrimitive.Label ref={ref} className={cn("px-2.5 py-1.5 text-xs font-semibold", inset && "pl-8", className)} {...props} />
 ));
 DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName;
 
