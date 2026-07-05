@@ -2,13 +2,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Search, Plus, Phone, MapPin, Pencil, Trash2, Download, Lock, AlertTriangle } from "lucide-react";
+import { Search, Plus, Phone, MapPin, Pencil, Trash2, Download, Lock, AlertTriangle, LayoutGrid, List } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
@@ -29,6 +31,7 @@ export default function Customers() {
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [deleteInfo, setDeleteInfo] = useState<{ salesCount: number; arrearsCount: number } | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ["customers"],
@@ -173,16 +176,67 @@ export default function Customers() {
         <Button variant="outline" size="sm" onClick={() => downloadPDF(`customers_${new Date().toISOString().split("T")[0]}.pdf`, "Customers List", ["Name","Phone","Address","Purchases","Arrear","Last Purchase"], filtered.map((c: Customer) => [c.name, c.phone, c.address, c.total_purchases||0, c.outstanding_arrear||0, c.last_purchase||""]))}>
           <Download className="h-4 w-4 mr-1" /> PDF
         </Button>
+        <div className="flex items-center border border-border rounded-lg overflow-hidden">
+          <button onClick={() => setViewMode("grid")} className={cn("p-2 transition-colors", viewMode === "grid" ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-2")}>
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button onClick={() => setViewMode("list")} className={cn("p-2 transition-colors", viewMode === "list" ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-2")}>
+            <List className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      <div className="rounded-xl border border-border">
-        <DataTable
-          columns={columns}
-          data={filtered}
-          loading={isLoading}
-          keyExtractor={(c: Customer) => c.id}
-          onRowClick={(c: Customer) => navigate(`/customers/${c.id}`)}
-        />
-      </div>
+      {viewMode === "list" ? (
+        <div className="rounded-xl border border-border">
+          <DataTable
+            columns={columns}
+            data={filtered}
+            loading={isLoading}
+            keyExtractor={(c: Customer) => c.id}
+            onRowClick={(c: Customer) => navigate(`/customers/${c.id}`)}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {isLoading ? (
+            Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-28 rounded-xl bg-surface-2 animate-pulse" />)
+          ) : filtered.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-sm text-text-secondary">
+              {search ? "No customers match your search" : "No customers yet."}
+            </div>
+          ) : (
+            filtered.map((c: Customer) => (
+              <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/customers/${c.id}`)}>
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                      <Phone className="h-5 w-5 text-accent" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-text-primary truncate">{c.name}</h3>
+                      <p className="text-xs text-text-secondary mt-0.5">{c.phone}</p>
+                      {c.address && <p className="flex items-center gap-1 text-[11px] text-text-secondary mt-1"><MapPin className="h-3 w-3 shrink-0" />{c.address}</p>}
+                      <div className="flex items-center gap-3 mt-2 text-xs">
+                        <span className="text-text-secondary">Purchases: <span className="font-mono font-medium text-text-primary">{c.total_purchases ?? 0}</span></span>
+                        {(c.outstanding_arrear ?? 0) > 0 && (
+                          <span className="text-warning">Arrear: <span className="font-mono font-medium">{formatCurrency(c.outstanding_arrear)}</span></span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors" title="Edit">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(c); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
       <Dialog open={forceDeleteOpen} onOpenChange={(v) => { if (!v) { setForceDeleteOpen(false); setDeleteTarget(null); setDeleteInfo(null); setAdminPassword(""); } }}>
         <DialogContent>
           <DialogHeader>

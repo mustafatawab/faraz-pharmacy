@@ -77,7 +77,7 @@ export default function Distributors() {
 
   function openEdit(d: Distributor) {
     setEditingId(d.id);
-    setForm({ name: d.name, phone: d.phone, companyId: d.company_id || "" });
+    setForm({ name: d.name, phone: d.phone, companyId: (d as any).companyId || "" });
     setOpen(true);
   }
 
@@ -110,7 +110,7 @@ export default function Distributors() {
           <DataTable
             columns={[
               { key: "name", header: "Name", cell: (d: Distributor) => <span className="font-medium text-text-primary">{d.name}</span> },
-              { key: "phone", header: "Contact", cell: (d: Distributor) => <span className="font-mono text-sm">{d.phone}</span> },
+              { key: "phone", header: "Contact", cell: (d: Distributor) => <span className="font-mono text-[11px]">{d.phone}</span> },
               { key: "company_name", header: "Company", cell: (d: Distributor) => <span className="text-text-secondary">{d.company_name || "\u2014"}</span> },
               { key: "product_count", header: "Products", cell: (d: Distributor) => <span className="font-mono">{d.product_count ?? 0}</span> },
               {
@@ -176,7 +176,11 @@ export default function Distributors() {
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Distributor" : "Add Distributor"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="px-5 pb-5 space-y-3">
+            <div>
+              <Label>Distributor Name</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
             <div>
               <Label>Company</Label>
               <SearchableSelect
@@ -187,14 +191,10 @@ export default function Distributors() {
               />
             </div>
             <div>
-              <Label>Distributor Name</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <div>
               <Label>Contact Number</Label>
               <Input inputMode="numeric" pattern="[0-9]*" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 11) })} />
             </div>
-            <Button className="w-full" disabled={!form.name || form.phone.length !== 11 || createMutation.isPending || updateMutation.isPending}
+            <Button className="w-full" disabled={!form.name || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Distributor" : "Add Distributor"}
             </Button>

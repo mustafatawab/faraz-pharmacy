@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Phone, Package, Search, Plus, Pencil, Trash2, Download } from "lucide-react";
+import { Building2, Phone, Package, Search, Plus, Pencil, Trash2, Download, LayoutGrid, List } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
+import DataTable from "@/components/shared/DataTable";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
@@ -21,6 +23,7 @@ export default function Companies() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", address: "", second_number: "" });
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const { data: companies = [], isLoading } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
 
@@ -90,8 +93,44 @@ export default function Companies() {
         <Button variant="outline" size="sm" onClick={() => downloadPDF(`companies_${new Date().toISOString().split("T")[0]}.pdf`, "Companies List", ["Name","Company Contact","Contact #2","Address","Products"], filtered.map((c: Company) => [c.name, c.phone, c.second_number||"", c.address, c.product_count||0]))}>
           <Download className="h-4 w-4 mr-1" /> PDF
         </Button>
+        <div className="flex items-center border border-border rounded-lg overflow-hidden">
+          <button onClick={() => setViewMode("grid")} className={cn("p-2 transition-colors", viewMode === "grid" ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-2")}>
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button onClick={() => setViewMode("list")} className={cn("p-2 transition-colors", viewMode === "list" ? "bg-accent text-white" : "text-text-secondary hover:bg-surface-2")}>
+            <List className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {viewMode === "list" ? (
+        <div className="rounded-xl border border-border">
+          <DataTable
+            columns={[
+              { key: "name", header: "Name", cell: (c: Company) => <span className="font-medium text-text-primary">{c.name}</span> },
+              { key: "phone", header: "Contact", cell: (c: Company) => <span className="font-mono text-[11px]">{c.phone}</span> },
+              { key: "second_number", header: "Contact #2", cell: (c: Company) => <span className="font-mono text-[11px] text-text-secondary">{c.second_number || "\u2014"}</span> },
+              { key: "product_count", header: "Products", cell: (c: Company) => <span className="font-mono">{c.product_count ?? 0}</span> },
+              {
+                key: "actions", header: "", cell: (c: Company) => (
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openEdit(c)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors" title="Edit">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => setDeleteId(c.id)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+            data={filtered}
+            loading={isLoading}
+            keyExtractor={(c: Company) => c.id}
+            emptyMessage="No companies found"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
         ) : filtered.length === 0 ? (
@@ -128,13 +167,14 @@ export default function Companies() {
           ))
         )}
       </div>
+      )}
 
       <Dialog open={open} onOpenChange={(v) => { if (!v) { setEditingId(null); } setOpen(v); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Company" : "Add Company"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="px-5 pb-5 space-y-3">
             <div>
               <Label>Company Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -153,7 +193,7 @@ export default function Companies() {
               <Label>Address (optional)</Label>
               <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={3} className="flex w-full rounded-lg border border-border bg-transparent px-3 py-2 text-sm placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent disabled:cursor-not-allowed disabled:opacity-50 resize-none" />
             </div>
-            <Button className="w-full" disabled={!form.name || form.phone.length !== 11 || createMutation.isPending || updateMutation.isPending}
+            <Button className="w-full" disabled={!form.name || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Company" : "Add Company"}
             </Button>
