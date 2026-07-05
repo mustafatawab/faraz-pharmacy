@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Search, Archive, RotateCcw, Pencil, Download, Upload, Trash2 } from "lucide-react";
+import { Plus, Search, Archive, RotateCcw, Pencil, Download, Upload, Trash2, Tags } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCurrency, generateBarcode } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import type { Product, ProductPriceInput, Category } from "@/types";
 
 interface CsvRow {
@@ -65,6 +66,11 @@ export default function Products() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const [catOpen, setCatOpen] = useState(false);
+  const [catEditingId, setCatEditingId] = useState<string | null>(null);
+  const [catDeleteId, setCatDeleteId] = useState<string | null>(null);
+  const [catName, setCatName] = useState("");
+  const [catSearch, setCatSearch] = useState("");
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products", showArchived],
@@ -170,6 +176,41 @@ export default function Products() {
     },
     onError: (err) => {
       toast.error(err.message);
+    },
+  });
+
+  const catCreateMutation = useMutation({
+    mutationFn: () => api.categories.create({ name: catName }),
+    onSuccess: () => {
+      toast.success("Category created");
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      setCatName("");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const catUpdateMutation = useMutation({
+    mutationFn: () => api.categories.update(catEditingId!, { name: catName }),
+    onSuccess: () => {
+      toast.success("Category updated");
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      setCatOpen(false);
+      setCatEditingId(null);
+      setCatName("");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const catDeleteMutation = useMutation({
+    mutationFn: (id: string) => api.categories.delete(id),
+    onSuccess: () => {
+      toast.success("Category deleted");
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      setCatDeleteId(null);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+      setCatDeleteId(null);
     },
   });
 
@@ -441,11 +482,20 @@ export default function Products() {
 
   return (
     <div>
-      <PageHeader
-        title="Products"
-        description="Manage your pharmacy inventory"
-        action={{ label: "Add Product", onClick: openAdd }}
-      />
+      <div className="flex items-center justify-between mb-5">
+        <div className="space-y-0.5">
+          <h1 className="text-base font-semibold text-text-primary tracking-tight">Products</h1>
+          <p className="text-xs text-text-secondary">Manage your pharmacy inventory</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => { setCatEditingId(null); setCatName(""); setCatSearch(""); setCatOpen(true); }}>
+            <Tags className="h-3.5 w-3.5 mr-1" /> Categories
+          </Button>
+          <Button onClick={openAdd} className="gap-1.5" size="sm">
+            <Plus className="h-3.5 w-3.5" /> Add Product
+          </Button>
+        </div>
+      </div>
 
       {addedId && (
         <div className="mb-4 p-3 rounded-lg border border-success/20 bg-success/5 flex items-center justify-between">
@@ -627,7 +677,7 @@ export default function Products() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Pack Size (tablets per pack)</Label>
+              <Label>Pack Size (units per pack)</Label>
               <Input type="number" min="1" value={form.packSize} onChange={(e) => setForm({ ...form, packSize: e.target.value })} placeholder="e.g. 10" />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -691,6 +741,81 @@ export default function Products() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={catOpen} onOpenChange={(v) => { if (!v) { setCatEditingId(null); setCatName(""); } setCatOpen(v); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tags className="h-4 w-4 text-accent" />
+              Manage Categories
+            </DialogTitle>
+          </DialogHeader>
+          <div className="px-5 pb-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Input
+                value={catName}
+                onChange={(e) => setCatName(e.target.value)}
+                placeholder={catEditingId ? "Edit category name..." : "New category name..."}
+                autoFocus
+              />
+              <Button
+                disabled={!catName.trim() || catCreateMutation.isPending || catUpdateMutation.isPending}
+                onClick={() => catEditingId ? catUpdateMutation.mutate() : catCreateMutation.mutate()}
+                className="shrink-0"
+              >
+                {catCreateMutation.isPending || catUpdateMutation.isPending ? "Saving..." : catEditingId ? "Update" : "Add"}
+              </Button>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary" />
+              <Input
+                value={catSearch}
+                onChange={(e) => setCatSearch(e.target.value)}
+                placeholder="Search categories..."
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto space-y-1">
+              {categories
+                .filter((c: Category) => !catSearch || c.name.toLowerCase().includes(catSearch.toLowerCase()))
+                .map((cat: Category) => (
+                  <div key={cat.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+                    <span className="text-sm text-text-primary truncate">{cat.name}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => { setCatEditingId(cat.id); setCatName(cat.name); }}
+                        className="h-6 w-6 rounded flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => setCatDeleteId(cat.id)}
+                        className="h-6 w-6 rounded flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              {categories.length === 0 && (
+                <p className="text-xs text-text-secondary text-center py-6">No categories yet.</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!catDeleteId}
+        onOpenChange={(v) => { if (!v) setCatDeleteId(null); }}
+        title="Delete Category"
+        description="Are you sure you want to delete this category? Products assigned to it will not be affected."
+        confirmLabel="Delete"
+        onConfirm={() => { if (catDeleteId) catDeleteMutation.mutate(catDeleteId); }}
+        loading={catDeleteMutation.isPending}
+      />
     </div>
   );
 }

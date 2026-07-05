@@ -84,7 +84,6 @@ function AppShell() {
               <Route path="/distributors" element={<AnimatedPage><Distributors /></AnimatedPage>} />
               <Route path="/companies" element={<AnimatedPage><Companies /></AnimatedPage>} />
               <Route path="/returns" element={<AnimatedPage><Returns /></AnimatedPage>} />
-              <Route path="/categories" element={<AnimatedPage><Categories /></AnimatedPage>} />
               <Route path="/expenses" element={<AnimatedPage><Expenses /></AnimatedPage>} />
               <Route path="/reports" element={<AnimatedPage><Reports /></AnimatedPage>} />
               <Route path="/invoices" element={<AnimatedPage><Invoices /></AnimatedPage>} />

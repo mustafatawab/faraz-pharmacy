@@ -37,7 +37,7 @@ interface CheckoutPanelProps {
 
 export default function CheckoutPanel({
   items, discount, discountValue, discountType, subtotal, total, customerId,
-  onUpdateQuantity, onRemoveItem, onDiscountChange, onToggleDiscountType,
+  onUpdateQuantity, onIncrementBy, onRemoveItem, onDiscountChange, onToggleDiscountType,
   onClearCart, onCheckout, onCustomerChange, error,
 }: CheckoutPanelProps) {
   const [quickAddOpen, setQuickAddOpen] = useState(false);

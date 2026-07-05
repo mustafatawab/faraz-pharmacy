@@ -15,7 +15,6 @@ const navItems = [
   { href: "/pos", label: "POS / Sales", icon: ShoppingCart },
   { href: "/products", label: "Products", icon: Package },
   { href: "/stock", label: "Stock", icon: Boxes },
-  { href: "/categories", label: "Categories", icon: Tags },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/invoices", label: "Invoices", icon: Receipt },
   { href: "/arrears", label: "Arrears", icon: CreditCard },

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, RotateCcw, Eye, EyeOff, Barcode } from "lucide-react";
+import { Plus, Pencil, Trash2, RotateCcw, Eye, EyeOff, Barcode, Search } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ export default function Stock() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showValue, setShowValue] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
+  const [search, setSearch] = useState("");
   const [scanValue, setScanValue] = useState("");
   const scanRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
@@ -32,6 +33,13 @@ export default function Stock() {
 
   const { data: stockEntries = [], isLoading } = useQuery({ queryKey: ["stock"], queryFn: api.stock.list });
   const filtered = showArchived ? stockEntries : stockEntries.filter((s: StockPurchase) => s.active !== 0);
+  const searched = filtered.filter((s: StockPurchase) =>
+    !search
+    || (s.product_name && s.product_name.toLowerCase().includes(search.toLowerCase()))
+    || (s.company_name && s.company_name.toLowerCase().includes(search.toLowerCase()))
+    || (s.distributor_name && s.distributor_name.toLowerCase().includes(search.toLowerCase()))
+    || (s.invoice_number && s.invoice_number.toLowerCase().includes(search.toLowerCase()))
+  );
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: api.products.list });
   const { data: distributors = [] } = useQuery({ queryKey: ["distributors"], queryFn: api.distributors.list });
   const { data: companies = [] } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
@@ -49,7 +57,7 @@ export default function Stock() {
     setForm({ ...form, quantity: qty, packs: q > 0 ? String(Math.round(q / packSize) || 1) : "1" });
   }
 
-  const totalValue = filtered.reduce((s: number, i: StockPurchase) => s + i.total_value, 0);
+  const totalValue = searched.reduce((s: number, i: StockPurchase) => s + i.total_value, 0);
 
   const createMutation = useMutation({
     mutationFn: () => api.stock.create({
@@ -204,6 +212,10 @@ export default function Stock() {
       </div>
 
       <div className="flex items-center gap-2 mb-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+          <Input placeholder="Search by product, company, distributor, invoice..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
         <div className="flex-1" />
         <button
           onClick={() => setShowArchived(!showArchived)}
@@ -214,7 +226,7 @@ export default function Stock() {
         </button>
       </div>
       <div className="rounded-lg border border-border">
-        <DataTable columns={columns} data={filtered} loading={isLoading} keyExtractor={(s: StockPurchase) => s.id} />
+        <DataTable columns={columns} data={searched} loading={isLoading} keyExtractor={(s: StockPurchase) => s.id} />
       </div>
 
       <Dialog open={open} onOpenChange={(v) => { if (!v) { setEditingId(null); } setOpen(v); }}>
@@ -275,7 +287,7 @@ export default function Stock() {
                 <Input type="number" min="1" value={form.packs} onChange={(e) => handlePacksChange(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Total Tablets</Label>
+                <Label>Total Quantity</Label>
                 <div onDoubleClick={() => setQtyLocked(false)}>
                   <Input
                     type="number"
