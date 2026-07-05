@@ -6,7 +6,10 @@ import type {
 } from "@/types";
 import type { BackupResult, BackupEntry, GDriveConfig } from "@/types/electron";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+function getApiUrl(): string {
+  if (window.appConfig?.serverUrl) return window.appConfig.serverUrl;
+  return import.meta.env.VITE_API_URL || "http://localhost:3001";
+}
 
 function getToken(): string | null {
   return localStorage.getItem("faraz_access_token");
@@ -18,7 +21,7 @@ async function fetchJson<T>(method: string, path: string, body?: unknown, auth =
     const token = getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${getApiUrl()}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
