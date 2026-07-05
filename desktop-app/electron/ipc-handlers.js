@@ -7,12 +7,31 @@ const { printReceipt, printReturnReceipt } = require("./printer");
 
 function getLocalIp() {
   const ifaces = os.networkInterfaces();
+
+  function isEthernet(name) {
+    const lower = name.toLowerCase();
+    return (
+      lower.startsWith("en") ||
+      lower.startsWith("eth") ||
+      lower.startsWith("enp") ||
+      lower.startsWith("ens") ||
+      lower.includes("ethernet") ||
+      lower.includes("thunderbolt")
+    );
+  }
+
+  let fallback = null;
+
   for (const name of Object.keys(ifaces)) {
     for (const iface of ifaces[name]) {
-      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+      if (iface.family === "IPv4" && !iface.internal) {
+        if (isEthernet(name)) return iface.address;
+        if (!fallback) fallback = iface.address;
+      }
     }
   }
-  return "127.0.0.1";
+
+  return fallback || "127.0.0.1";
 }
 
 function ensureBackupsDir() {

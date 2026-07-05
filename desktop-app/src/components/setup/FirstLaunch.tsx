@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Monitor, Server, Wifi, Info } from "lucide-react";
+import { Monitor, Server, Wifi, Info, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,9 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
   const [serverIp, setServerIp] = useState("192.168.1.");
   const [myIp, setMyIp] = useState("");
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState("");
+  const [checkSuccess, setCheckSuccess] = useState(false);
 
   async function save(cfg: { mode: string; serverUrl?: string }) {
     setSaving(true);
@@ -31,6 +34,26 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
     }
   }
 
+  async function handleConnect() {
+    setChecking(true);
+    setCheckError("");
+    setCheckSuccess(false);
+    const port = window.appConfig?.serverPort ?? 3001;
+    const url = `http://${serverIp}:${port}/api/health`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const data = await res.json();
+      if (data.status !== "ok") throw new Error("Unexpected server response");
+      setCheckSuccess(true);
+      await save({ mode: "client", serverUrl: `http://${serverIp}:${port}` });
+    } catch (err) {
+      setCheckError(err instanceof Error ? err.message : "Connection failed");
+    } finally {
+      setChecking(false);
+    }
+  }
+
   if (step === "server-ip") {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
@@ -45,7 +68,7 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
           <div className="bg-surface-2 rounded-xl p-4 mb-6 border border-border">
             <p className="text-xs text-text-secondary mb-1">This machine's IP address</p>
             <p className="text-2xl font-mono font-bold text-accent">{myIp}</p>
-            <p className="text-xs text-text-secondary mt-2">Port: <span className="font-mono">3001</span></p>
+            <p className="text-xs text-text-secondary mt-2">Port: <span className="font-mono">{window.appConfig?.serverPort ?? 3001}</span></p>
           </div>
           <div className="bg-warning/5 border border-warning/20 rounded-xl p-4 mb-6 text-left">
             <div className="flex items-start gap-2">
@@ -126,7 +149,7 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
               <Label>Server IP Address</Label>
               <Input
                 value={serverIp}
-                onChange={(e) => setServerIp(e.target.value)}
+                onChange={(e) => { setServerIp(e.target.value); setCheckError(""); setCheckSuccess(false); }}
                 placeholder="e.g. 192.168.1.100"
                 className="mt-1 font-mono"
                 autoFocus
@@ -139,16 +162,30 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
                 </p>
               </div>
             </div>
+            {checkError && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-danger/5 border border-danger/20 text-sm text-danger">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{checkError}</span>
+              </div>
+            )}
+            {checkSuccess && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-success/5 border border-success/20 text-sm text-success">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>Connected to server</span>
+              </div>
+            )}
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep("choose")}>
+              <Button variant="outline" className="flex-1" onClick={() => { setStep("choose"); setCheckError(""); setCheckSuccess(false); }}>
                 Back
               </Button>
               <Button
                 className="flex-1"
-                disabled={!serverIp}
-                onClick={() => save({ mode: "client", serverUrl: `http://${serverIp}:3001` })}
+                disabled={!serverIp || checking}
+                onClick={handleConnect}
               >
-                {saving ? "Saving..." : "Connect"}
+                {checking ? (
+                  <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Checking...</span>
+                ) : saving ? "Saving..." : "Connect"}
               </Button>
             </div>
           </div>
