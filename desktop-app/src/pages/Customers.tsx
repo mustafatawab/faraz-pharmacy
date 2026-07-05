@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import type { Customer } from "@/types";
 
 export default function Customers() {
@@ -23,6 +24,7 @@ export default function Customers() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [forceDeleteOpen, setForceDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [deleteInfo, setDeleteInfo] = useState<{ salesCount: number; arrearsCount: number } | null>(null);
@@ -69,9 +71,11 @@ export default function Customers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success("Customer deleted");
+      setDeleteId(null);
     },
     onError: (err) => {
       toast.error(err.message);
+      setDeleteId(null);
     },
   });
 
@@ -101,7 +105,7 @@ export default function Customers() {
       setAdminPassword("");
       setForceDeleteOpen(true);
     } else {
-      if (confirm("Delete this customer?")) deleteMutation.mutate(c.id);
+      setDeleteId(c.id);
     }
   }
 
@@ -234,6 +238,16 @@ export default function Customers() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(v) => { if (!v) setDeleteId(null); }}
+        title="Delete Customer"
+        description="Are you sure you want to delete this customer?"
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

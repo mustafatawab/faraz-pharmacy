@@ -31,22 +31,22 @@ const HEADER_LOOKUP: Record<string, string> = {
 };
 
 interface PriceTierForm {
-  label: string; purchasePrice: string; salePrice: string;
+  purchasePrice: string; salePrice: string;
 }
 
 interface ProductForm {
   barcode: string; name: string; category: string; location: string;
-  purchasePrice: string; salePrice: string; expiry: string;
+  purchasePrice: string; salePrice: string; packSize: string;
   prices: PriceTierForm[];
 }
 
 const emptyPriceTier = (): PriceTierForm => ({
-  label: "", purchasePrice: "", salePrice: "",
+  purchasePrice: "", salePrice: "",
 });
 
 const emptyForm = (): ProductForm => ({
   barcode: generateBarcode(), name: "", category: "", location: "",
-  purchasePrice: "", salePrice: "", expiry: "",
+  purchasePrice: "", salePrice: "", packSize: "1",
   prices: [],
 });
 
@@ -64,6 +64,7 @@ export default function Products() {
   const [importImporting, setImportImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products", showArchived],
@@ -80,6 +81,10 @@ export default function Products() {
       setTimeout(() => barcodeInputRef.current?.focus(), 100);
     }
   }, [open]);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   async function checkBarcode(barcode: string) {
     if (!barcode.trim()) { setBarcodeExists(null); return; }
@@ -105,7 +110,6 @@ export default function Products() {
     const validPrices = form.prices.filter((p) => p.purchasePrice);
     if (validPrices.length === 0) return undefined;
     return validPrices.map((p) => ({
-      label: p.label || undefined,
       purchasePrice: Number(p.purchasePrice),
       salePrice: Number(p.salePrice) || 0,
     }));
@@ -115,8 +119,7 @@ export default function Products() {
     mutationFn: () => api.products.create({
       barcode: form.barcode, name: form.name, category: form.category,
       location: form.location, purchasePrice: Number(form.purchasePrice),
-      salePrice: Number(form.salePrice) || 0,
-      expiry: form.expiry || undefined,
+      salePrice: Number(form.salePrice) || 0, packSize: Number(form.packSize),
       prices: buildPricesPayload(),
     }),
     onSuccess: (product) => {
@@ -134,8 +137,7 @@ export default function Products() {
     mutationFn: () => api.products.update(editingId!, {
       barcode: form.barcode, name: form.name, category: form.category,
       location: form.location, purchasePrice: Number(form.purchasePrice),
-      salePrice: Number(form.salePrice) || 0,
-      expiry: form.expiry || undefined,
+      salePrice: Number(form.salePrice) || 0, packSize: Number(form.packSize),
       prices: buildPricesPayload(),
     }),
     onSuccess: () => {
@@ -180,14 +182,13 @@ export default function Products() {
 
   function openEdit(product: Product) {
     setEditingId(product.id);
-    const p = (product as any).prices as { label: string; purchasePrice: number; salePrice: number }[] | undefined;
+    const p = (product as any).prices as { purchasePrice: number; salePrice: number }[] | undefined;
     setForm({
       barcode: product.barcode, name: product.name, category: product.category,
       location: product.location, purchasePrice: String(product.purchase_price),
-      salePrice: String(product.sale_price),
-      expiry: product.expiry || "",
+      salePrice: String(product.sale_price), packSize: String(product.pack_size),
       prices: p
-        ? p.map((pt) => ({ label: pt.label, purchasePrice: String(pt.purchasePrice), salePrice: String(pt.salePrice) }))
+        ? p.map((pt) => ({ purchasePrice: String(pt.purchasePrice), salePrice: String(pt.salePrice) }))
         : [],
     });
     setBarcodeExists(null);
@@ -391,7 +392,23 @@ export default function Products() {
       <span className="text-[10px] text-text-secondary bg-surface-2 px-1.5 py-0.5 rounded">{p.category || "\u2014"}</span>
     ) },
     { key: "location", header: "Location", cell: (p: Product) => <span className="text-[11px] font-mono text-text-secondary">{p.location || "\u2014"}</span> },
-    { key: "salePrice", header: "Sale Price", cell: (p: Product) => <span className="font-mono text-xs font-semibold">{formatCurrency(p.sale_price)}</span> },
+    { key: "prices", header: "Prices", cell: (p: Product) => {
+      const allPrices = (p as any).prices as { purchasePrice: number; salePrice: number; label?: string }[] | undefined;
+      return (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-mono text-xs font-semibold text-accent">{formatCurrency(p.sale_price)}</span>
+          {allPrices && allPrices.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {allPrices.map((pt, i) => (
+                <span key={i} className="text-[9px] font-mono text-text-secondary bg-surface-2 px-1 rounded">
+                  {formatCurrency(pt.salePrice)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    } },
     { key: "stockQty", header: "Stock", cell: (p: Product) => (
       <span className={`font-mono text-xs font-semibold ${p.stock_qty <= 5 ? "text-danger" : p.active ? "text-text-primary" : "text-text-secondary"}`}>{p.stock_qty}</span>
     ) },
@@ -446,7 +463,22 @@ export default function Products() {
       <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary" />
-          <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+          <Input
+            ref={searchRef}
+            placeholder="Search or scan barcode..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={async (e) => {
+              if (e.key === "Enter" && search.trim()) {
+                const product = await api.products.getByBarcode(search.trim());
+                if (product) {
+                  toast.success(`Found: ${product.name}`);
+                  setSearch(product.barcode);
+                }
+              }
+            }}
+            className="pl-8"
+          />
         </div>
         <div className="flex items-center gap-1.5 ml-auto">
           <Button variant="outline" size="sm" className={showArchived ? "border-accent text-accent" : ""} onClick={() => setShowArchived(!showArchived)}>
@@ -594,6 +626,10 @@ export default function Products() {
                 <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Shelf A1" />
               </div>
             </div>
+            <div className="space-y-1">
+              <Label>Pack Size (tablets per pack)</Label>
+              <Input type="number" min="1" value={form.packSize} onChange={(e) => setForm({ ...form, packSize: e.target.value })} placeholder="e.g. 10" />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Purchase Price</Label>
@@ -617,16 +653,7 @@ export default function Products() {
               )}
               {form.prices.map((pt, i) => (
                 <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-surface-2">
-                  <div className="flex-1 grid grid-cols-3 gap-2">
-                    <div>
-                      <Label className="text-[10px] text-text-secondary">Label</Label>
-                      <Input
-                        value={pt.label}
-                        onChange={(e) => updatePriceTier(i, "label", e.target.value)}
-                        placeholder="e.g. Wholesale"
-                        className="h-7 text-[11px]"
-                      />
-                    </div>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-[10px] text-text-secondary">Purchase</Label>
                       <Input
@@ -657,10 +684,6 @@ export default function Products() {
               ))}
             </div>
 
-            <div className="space-y-1">
-              <Label>Expiry (optional)</Label>
-              <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} min={new Date().toISOString().split("T")[0]} />
-            </div>
             <Button className="w-full mt-1" disabled={!form.name || !form.purchasePrice || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Product" : "Add Product"}

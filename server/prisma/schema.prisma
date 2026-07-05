@@ -54,6 +54,7 @@ model Product {
   markupPercent  Float            @default(20) @map("markup_percent")
   stockQty       Int              @default(0) @map("stock_qty")
   expiry         String?
+  packSize       Int              @default(1) @map("pack_size")
   active         Int              @default(1)
   createdAt      DateTime         @default(now()) @map("created_at")
   distributor    Distributor?     @relation(fields: [distributorId], references: [id])
@@ -178,6 +179,7 @@ model StockPurchase {
   salePrice      Float        @default(0) @map("sale_price")
   expiry         String?
   totalValue     Float        @default(0) @map("total_value")
+  active         Int          @default(1)
   createdAt      DateTime     @default(now()) @map("created_at")
   product        Product      @relation(fields: [productId], references: [id])
   distributor    Distributor? @relation(fields: [distributorId], references: [id])

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { api } from "@/lib/api";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import type { Expense } from "@/types";
 
 const categories = ["All", "Utilities", "Salaries", "Supplies", "Rent"];
@@ -20,6 +21,7 @@ export default function Expenses() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ title: "", category: "Utilities", amount: "", notes: "", date: new Date().toISOString().split("T")[0] });
@@ -65,8 +67,12 @@ export default function Expenses() {
     onSuccess: () => {
       toast.success("Expense deleted");
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      setDeleteId(null);
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      toast.error(err.message);
+      setDeleteId(null);
+    },
   });
 
   function openAdd() {
@@ -95,7 +101,7 @@ export default function Expenses() {
           <button onClick={() => openEdit(e)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors" title="Edit">
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button onClick={() => { if (confirm("Delete this expense?")) deleteMutation.mutate(e.id); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
+          <button onClick={() => setDeleteId(e.id)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -145,6 +151,16 @@ export default function Expenses() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(v) => { if (!v) setDeleteId(null); }}
+        title="Delete Expense"
+        description="Are you sure you want to delete this expense?"
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

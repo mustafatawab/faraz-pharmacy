@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatDateTime, formatFileSize } from "@/lib/utils";
 import { api } from "@/lib/api";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import type { BackupEntry, GDriveConfig } from "@/types/electron";
 
 async function verifyAdminPassword(password: string): Promise<boolean> {
@@ -49,6 +50,7 @@ export default function Settings() {
   const [passwordError, setPasswordError] = useState("");
   const [backupDirectory, setBackupDirectory] = useState("");
   const [recoveryDialog, setRecoveryDialog] = useState<{ open: boolean; phrase: string }>({ open: false, phrase: "" });
+  const [deleteBackup, setDeleteBackup] = useState<string | null>(null);
 
   const { data: backups = [], isLoading: backupsLoading } = useQuery({
     queryKey: ["settings", "backups"],
@@ -113,9 +115,11 @@ export default function Settings() {
     onSuccess: () => {
       toast.success("Backup deleted");
       queryClient.invalidateQueries({ queryKey: ["settings", "backups"] });
+      setDeleteBackup(null);
     },
     onError: (err: Error) => {
       toast.error(err.message);
+      setDeleteBackup(null);
     },
   });
 
@@ -368,7 +372,7 @@ export default function Settings() {
                               <RotateCcw className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => { if (confirm("Delete this backup?")) deleteBackupMutation.mutate(backup.name); }}
+                              onClick={() => setDeleteBackup(backup.name)}
                               className="h-8 w-8 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors"
                               title="Delete backup"
                             >
@@ -555,6 +559,16 @@ export default function Settings() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteBackup}
+        onOpenChange={(v) => { if (!v) setDeleteBackup(null); }}
+        title="Delete Backup"
+        description="Are you sure you want to delete this backup file? This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteBackup) deleteBackupMutation.mutate(deleteBackup); }}
+        loading={deleteBackupMutation.isPending}
+      />
     </div>
   );
 }

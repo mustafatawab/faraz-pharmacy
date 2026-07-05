@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import type { Company } from "@/types";
 
 export default function Companies() {
@@ -18,6 +19,7 @@ export default function Companies() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", address: "", second_number: "" });
 
   const { data: companies = [], isLoading } = useQuery({ queryKey: ["companies"], queryFn: api.companies.list });
@@ -54,8 +56,12 @@ export default function Companies() {
     onSuccess: () => {
       toast.success("Company deleted");
       queryClient.invalidateQueries({ queryKey: ["companies"] });
+      setDeleteId(null);
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      toast.error(err.message);
+      setDeleteId(null);
+    },
   });
 
   function openAdd() {
@@ -112,7 +118,7 @@ export default function Companies() {
                     <button onClick={() => openEdit(comp)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors" title="Edit">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => { if (confirm("Delete this company?")) deleteMutation.mutate(comp.id); }} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
+                    <button onClick={() => setDeleteId(comp.id)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors" title="Delete">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -154,6 +160,16 @@ export default function Companies() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(v) => { if (!v) setDeleteId(null); }}
+        title="Delete Company"
+        description="Are you sure you want to delete this company? Associated distributors will not be affected."
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

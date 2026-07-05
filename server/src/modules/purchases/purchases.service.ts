@@ -95,4 +95,23 @@ export const purchasesService = {
       return updated;
     });
   },
+
+  async remove(id: string) {
+    const old = await prisma.stockPurchase.findUnique({ where: { id } });
+    if (!old) throw new NotFoundError("Stock purchase");
+
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const updated = await tx.stockPurchase.update({
+        where: { id },
+        data: { active: 0 },
+      });
+
+      await tx.product.update({
+        where: { id: old.productId },
+        data: { stockQty: { decrement: old.quantity } },
+      });
+
+      return { success: true };
+    });
+  },
 };

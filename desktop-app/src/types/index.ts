@@ -34,6 +34,7 @@ export interface Product {
   purchase_price: number;
   markup_percent: number;
   stock_qty: number;
+  pack_size: number;
   expiry?: string;
   active: number;
   created_at: string;
@@ -50,6 +51,7 @@ export interface ProductInput {
   category?: string;
   location?: string;
   expiry?: string;
+  packSize?: number;
   prices?: ProductPriceInput[];
 }
 
@@ -150,6 +152,7 @@ export interface StockPurchase {
   sale_price: number;
   expiry?: string;
   total_value: number;
+  active?: number;
   created_at: string;
 }
 

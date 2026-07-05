@@ -65,6 +65,7 @@ export const medicinesService = {
         markupPercent: data.markupPercent ?? 20,
         stockQty: data.stockQty ?? 0,
         expiry: data.expiry ?? null,
+        packSize: data.packSize ?? 1,
         prices: { createMany: { data: pricesData } },
       },
       include: { prices: true },
@@ -91,6 +92,7 @@ export const medicinesService = {
       markupPercent: data.markupPercent ?? old.markupPercent,
       stockQty: data.stockQty ?? 0,
       expiry: data.expiry ?? null,
+      packSize: data.packSize ?? old.packSize,
     };
 
     if (data.prices) {

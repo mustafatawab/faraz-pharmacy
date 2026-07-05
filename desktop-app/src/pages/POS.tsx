@@ -109,12 +109,22 @@ export default function POS() {
   const handleBarcodeSubmit = async (value: string) => {
     const product = await api.products.getByBarcode(value);
     if (product) {
+      const existing = cart.items.find(i => i.productId === product.id);
+      if (existing) {
+        cart.incrementBy(product.id, product.pack_size);
+        return;
+      }
       promptPriceTier(product);
     } else {
       const found = displayProducts.find(
         (p: Product) => p.barcode === value || p.name.toLowerCase() === value.toLowerCase()
       );
       if (found) {
+        const existing = cart.items.find(i => i.productId === found.id);
+        if (existing) {
+          cart.incrementBy(found.id, found.pack_size);
+          return;
+        }
         promptPriceTier(found);
       }
     }
@@ -123,6 +133,11 @@ export default function POS() {
   const handleAddProduct = (product: Product) => {
     if (product.stock_qty === 0) {
       setError(`${product.name} is out of stock`);
+      return;
+    }
+    const existing = cart.items.find(i => i.productId === product.id);
+    if (existing) {
+      cart.incrementBy(product.id, product.pack_size);
       return;
     }
     promptPriceTier(product);
@@ -245,6 +260,7 @@ export default function POS() {
             total={cart.total}
             customerId={cart.customerId}
             onUpdateQuantity={cart.updateQuantity}
+            onIncrementBy={cart.incrementBy}
             onRemoveItem={cart.removeItem}
             onDiscountChange={cart.setDiscountValue}
             onToggleDiscountType={cart.toggleDiscountType}

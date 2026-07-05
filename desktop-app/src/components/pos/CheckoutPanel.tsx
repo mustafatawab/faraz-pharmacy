@@ -25,6 +25,7 @@ interface CheckoutPanelProps {
   total: number;
   customerId?: string;
   onUpdateQuantity: (productId: string, quantity: number) => void;
+  onIncrementBy: (productId: string, amount: number) => void;
   onRemoveItem: (productId: string) => void;
   onDiscountChange: (discount: number) => void;
   onToggleDiscountType: () => void;
@@ -118,7 +119,7 @@ export default function CheckoutPanel({
         ) : (
           <div>
             {items.map((item) => (
-              <CartItem key={item.productId} item={item} onUpdateQuantity={onUpdateQuantity} onRemove={onRemoveItem} />
+              <CartItem key={item.productId} item={item} onUpdateQuantity={onUpdateQuantity} onIncrementBy={onIncrementBy} onRemove={onRemoveItem} />
             ))}
           </div>
         )}

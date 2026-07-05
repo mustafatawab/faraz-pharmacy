@@ -5,13 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | null | undefined): string {
+  const val = Number(amount ?? 0);
+  if (isNaN(val)) return "Rs\u00a00";
   return new Intl.NumberFormat("en-PK", {
     style: "currency",
     currency: "PKR",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(val);
 }
 
 export function formatDate(dateString?: string | null): string {

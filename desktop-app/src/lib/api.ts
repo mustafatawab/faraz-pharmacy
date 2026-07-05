@@ -95,6 +95,7 @@ const api = {
     list: (): Promise<StockPurchase[]> => fetchJson("GET", "/api/stock"),
     create: (p: StockInput): Promise<StockPurchase> => fetchJson("POST", "/api/stock", p),
     update: (id: string, p: StockInput): Promise<StockPurchase> => fetchJson("PUT", `/api/stock/${id}`, p),
+    delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/stock/${id}`),
   },
   distributors: {
     list: (): Promise<Distributor[]> => fetchJson("GET", "/api/distributors"),
