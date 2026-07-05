@@ -13,8 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCurrency, generateBarcode } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
-import type { Product, ProductPriceInput } from "@/types";
-import { PRODUCT_CATEGORIES } from "@/types";
+import type { Product, ProductPriceInput, Category } from "@/types";
 
 interface CsvRow {
   rowNum: number; barcode: string; name: string; category: string; location: string;
@@ -69,6 +68,11 @@ export default function Products() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products", showArchived],
     queryFn: () => showArchived ? api.products.listAll() : api.products.list(),
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: api.categories.list,
   });
 
   useEffect(() => {
@@ -579,8 +583,8 @@ export default function Products() {
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
-                    {PRODUCT_CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    {categories.map((cat: Category) => (
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

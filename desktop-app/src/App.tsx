@@ -17,6 +17,7 @@ import Stock from "@/pages/Stock";
 import Distributors from "@/pages/Distributors";
 import Companies from "@/pages/Companies";
 import Returns from "@/pages/Returns";
+import Categories from "@/pages/Categories";
 import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import Invoices from "@/pages/Invoices";
@@ -83,6 +84,7 @@ function AppShell() {
               <Route path="/distributors" element={<AnimatedPage><Distributors /></AnimatedPage>} />
               <Route path="/companies" element={<AnimatedPage><Companies /></AnimatedPage>} />
               <Route path="/returns" element={<AnimatedPage><Returns /></AnimatedPage>} />
+              <Route path="/categories" element={<AnimatedPage><Categories /></AnimatedPage>} />
               <Route path="/expenses" element={<AnimatedPage><Expenses /></AnimatedPage>} />
               <Route path="/reports" element={<AnimatedPage><Reports /></AnimatedPage>} />
               <Route path="/invoices" element={<AnimatedPage><Invoices /></AnimatedPage>} />

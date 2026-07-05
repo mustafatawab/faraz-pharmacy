@@ -14,6 +14,7 @@ import { returnsRoutes } from "./modules/returns/returns.routes";
 import { expensesRoutes } from "./modules/expenses/expenses.routes";
 import { reportsRoutes } from "./modules/reports/reports.routes";
 import { settingsRoutes } from "./modules/settings/settings.routes";
+import { categoriesRoutes } from "./modules/categories/categories.routes";
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use("/api/companies", companiesRoutes);
 app.use("/api/returns", returnsRoutes);
 app.use("/api/expenses", expensesRoutes);
 app.use("/api/dashboard", reportsRoutes);
+app.use("/api/categories", categoriesRoutes);
 app.use("/api/settings", settingsRoutes);
 
 app.use(errorHandler);

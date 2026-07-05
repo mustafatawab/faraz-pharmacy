@@ -1,7 +1,12 @@
-export const PRODUCT_CATEGORIES = [
-  "Tablets", "Capsules", "Syrups", "Injections",
-  "Creams", "Drops", "Inhalers", "Other",
-] as const;
+export interface Category {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface CategoryInput {
+  name: string;
+}
 
 export interface ProductPrice {
   id: string;

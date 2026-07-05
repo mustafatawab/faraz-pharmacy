@@ -2,7 +2,7 @@ import type {
   Product, ProductInput, Customer, CustomerInput, Sale, SaleInput,
   Arrear, ArrearInput, StockPurchase, StockInput, Distributor, DistributorInput,
   Company, CompanyInput, ReturnEntry, ReturnInput, Expense, ExpenseInput,
-  DashboardStats,
+  Category, CategoryInput, DashboardStats,
 } from "@/types";
 import type { BackupResult, BackupEntry, GDriveConfig } from "@/types/electron";
 
@@ -117,6 +117,12 @@ const api = {
     create: (e: ExpenseInput): Promise<Expense> => fetchJson("POST", "/api/expenses", e),
     update: (id: string, e: ExpenseInput): Promise<Expense> => fetchJson("PUT", `/api/expenses/${id}`, e),
     delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/expenses/${id}`),
+  },
+  categories: {
+    list: (): Promise<Category[]> => fetchJson("GET", "/api/categories"),
+    create: (c: CategoryInput): Promise<Category> => fetchJson("POST", "/api/categories", c),
+    update: (id: string, c: CategoryInput): Promise<Category> => fetchJson("PUT", `/api/categories/${id}`, c),
+    delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/categories/${id}`),
   },
   dashboard: {
     stats: (): Promise<DashboardStats> => fetchJson("GET", "/api/dashboard/stats"),
