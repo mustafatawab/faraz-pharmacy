@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Search, Archive, RotateCcw, Pencil, Download, Upload, Trash2, Tags } from "lucide-react";
+import { Plus, Search, Archive, RotateCcw, Pencil, Download, Upload, Trash2, Tags, Barcode } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -14,6 +14,7 @@ import { formatCurrency, generateBarcode } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { downloadCSV, downloadPDF } from "@/lib/export";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import PrintBarcodeDialog from "@/components/shared/PrintBarcodeDialog";
 import type { Product, ProductPriceInput, Category } from "@/types";
 
 interface CsvRow {
@@ -70,6 +71,7 @@ export default function Products() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [lastAddedProduct, setLastAddedProduct] = useState<{ barcode: string; name: string; price: number } | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm());
   const [barcodeExists, setBarcodeExists] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -86,6 +88,7 @@ export default function Products() {
   const [catDeleteId, setCatDeleteId] = useState<string | null>(null);
   const [catName, setCatName] = useState("");
   const [catSearch, setCatSearch] = useState("");
+  const [printBarcode, setPrintBarcode] = useState<{ barcode: string; name: string; price: number } | null>(null);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products", showArchived],
@@ -146,6 +149,7 @@ export default function Products() {
     onSuccess: (product) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setAddedId(product.id);
+      setLastAddedProduct({ barcode: product.barcode, name: product.name, price: product.sale_price });
       setOpen(false);
       toast.success("Product created");
     },
@@ -534,6 +538,11 @@ export default function Products() {
             <p className="text-xs text-text-primary font-medium">Product added successfully</p>
           </div>
           <div className="flex items-center gap-2">
+            {lastAddedProduct && (
+              <Button size="sm" variant="outline" onClick={() => { setPrintBarcode(lastAddedProduct); }}>
+                <Barcode className="h-3.5 w-3.5 mr-1" /> Print Barcode
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => { setAddedId(null); openAdd(); }}>Add Another</Button>
             <Button size="sm" onClick={() => setAddedId(null)}>Done</Button>
           </div>
@@ -574,6 +583,9 @@ export default function Products() {
           <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
           <Button variant="primary" size="sm" onClick={() => { setImportOpen(true); setImportRows([]); }}>
             <Upload className="h-3.5 w-3.5 mr-1" /> Import CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setPrintBarcode({ barcode: generateBarcode(), name: "", price: 0 })}>
+            <Barcode className="h-3.5 w-3.5 mr-1" /> Generate Barcode
           </Button>
         </div>
       </div>
@@ -916,6 +928,14 @@ export default function Products() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <PrintBarcodeDialog
+        open={!!printBarcode}
+        onOpenChange={(v) => { if (!v) setPrintBarcode(null); }}
+        barcode={printBarcode?.barcode ?? ""}
+        productName={printBarcode?.name ?? ""}
+        price={printBarcode?.price}
+      />
     </div>
   );
 }
