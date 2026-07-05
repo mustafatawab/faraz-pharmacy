@@ -7,7 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Lock, ArrowLeft, Pill, Sun, Moon } from "lucide-react";
 import { api } from "@/lib/api";
 
-export default function Login() {
+interface LoginProps {
+  onBackToSetup?: () => void;
+}
+
+export default function Login({ onBackToSetup }: LoginProps) {
   const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -259,7 +263,18 @@ export default function Login() {
               </form>
             </div>
 
-            <p className="text-center text-[10px] text-text-secondary/50 mt-5">Faraz Pharmacy POS</p>
+            {onBackToSetup && (
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={onBackToSetup}
+                  className="text-[11px] text-text-secondary hover:text-accent transition-colors"
+                >
+                  ← Back to setup
+                </button>
+              </div>
+            )}
+            <p className="text-center text-[10px] text-text-secondary/50 mt-3">Faraz Pharmacy POS</p>
           </motion.div>
         )}
       </AnimatePresence>

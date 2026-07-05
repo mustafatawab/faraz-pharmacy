@@ -39,39 +39,29 @@ function AnimatedPage({ children }: { children: React.ReactNode }) {
 function AppShell() {
   const { isAuthenticated } = useAuth();
   const [ready, setReady] = useState(false);
-  const [configured, setConfigured] = useState(true);
-  const [showSetup, setShowSetup] = useState(false);
+  const [showWizard, setShowWizard] = useState(true);
   const prevAuth = useRef(isAuthenticated);
   const location = useLocation();
 
   useEffect(() => {
-    try {
-      const cfg = window.appConfig;
-      if (cfg) {
-        setConfigured(cfg.mode === "server" || cfg.mode === "client");
-      }
-    } catch {}
-    if (localStorage.getItem("faraz_show_setup") === "true") {
-      setShowSetup(true);
-    }
     setReady(true);
   }, []);
 
   useEffect(() => {
     if (prevAuth.current === true && isAuthenticated === false) {
-      setShowSetup(true);
+      setShowWizard(true);
     }
     prevAuth.current = isAuthenticated;
   }, [isAuthenticated]);
 
   if (!ready) return null;
 
-  if (!configured || showSetup) {
-    return <FirstLaunch onComplete={() => { localStorage.removeItem("faraz_show_setup"); window.location.reload(); }} />;
+  if (showWizard) {
+    return <FirstLaunch onComplete={() => { setShowWizard(false); }} />;
   }
 
   if (!isAuthenticated) {
-    return <Login />;
+    return <Login onBackToSetup={() => setShowWizard(true)} />;
   }
 
   return (
