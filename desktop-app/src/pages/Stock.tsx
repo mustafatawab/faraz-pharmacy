@@ -94,19 +94,19 @@ export default function Stock() {
   }
 
   const columns = [
-    { key: "created_at", header: "Date", cell: (s: StockPurchase) => <span className="font-mono text-xs text-text-secondary">{formatDate(s.created_at)}</span> },
-    { key: "product_name", header: "Product", cell: (s: StockPurchase) => <span className="font-medium text-text-primary">{s.product_name}</span> },
-    { key: "company_name", header: "Company", cell: (s: StockPurchase) => <span className="text-xs text-text-secondary">{s.company_name || "\u2014"}</span> },
-    { key: "distributor_name", header: "Distributor", cell: (s: StockPurchase) => <span className="text-xs text-text-secondary">{s.distributor_name || "\u2014"}</span> },
-    { key: "invoice_number", header: "Invoice", cell: (s: StockPurchase) => <span className="font-mono text-xs text-text-secondary">{s.invoice_number || "\u2014"}</span> },
-    { key: "quantity", header: "Qty", cell: (s: StockPurchase) => <span className="font-mono">{s.quantity}</span> },
-    { key: "purchase_price", header: "Cost", cell: (s: StockPurchase) => <span className="font-mono">{formatCurrency(s.purchase_price)}</span> },
-    { key: "sale_price", header: "Sale Price", cell: (s: StockPurchase) => <span className="font-mono text-accent">{formatCurrency(s.sale_price)}</span> },
-    { key: "total_value", header: "Total", cell: (s: StockPurchase) => <span className="font-mono font-medium">{formatCurrency(s.total_value)}</span> },
-    { key: "expiry", header: "Expiry", cell: (s: StockPurchase) => <span className="font-mono text-xs text-text-secondary">{s.expiry ? formatDate(s.expiry) : "\u2014"}</span> },
+    { key: "created_at", header: "Date", cell: (s: StockPurchase) => <span className="font-mono text-[11px] text-text-secondary">{formatDate(s.created_at)}</span> },
+    { key: "product_name", header: "Product", cell: (s: StockPurchase) => <span className="text-xs font-medium text-text-primary">{s.product_name}</span> },
+    { key: "company_name", header: "Company", cell: (s: StockPurchase) => <span className="text-[11px] text-text-secondary">{s.company_name || "\u2014"}</span> },
+    { key: "distributor_name", header: "Distributor", cell: (s: StockPurchase) => <span className="text-[11px] text-text-secondary">{s.distributor_name || "\u2014"}</span> },
+    { key: "invoice_number", header: "Invoice", cell: (s: StockPurchase) => <span className="font-mono text-[11px] text-text-secondary">{s.invoice_number || "\u2014"}</span> },
+    { key: "quantity", header: "Qty", cell: (s: StockPurchase) => <span className="font-mono text-xs font-semibold">{s.quantity}</span> },
+    { key: "purchase_price", header: "Cost", cell: (s: StockPurchase) => <span className="font-mono text-xs">{formatCurrency(s.purchase_price)}</span> },
+    { key: "sale_price", header: "Sale Price", cell: (s: StockPurchase) => <span className="font-mono text-xs text-accent font-semibold">{formatCurrency(s.sale_price)}</span> },
+    { key: "total_value", header: "Total", cell: (s: StockPurchase) => <span className="font-mono text-xs font-bold text-text-primary">{formatCurrency(s.total_value)}</span> },
+    { key: "expiry", header: "Expiry", cell: (s: StockPurchase) => <span className="font-mono text-[11px] text-text-secondary">{s.expiry ? formatDate(s.expiry) : "\u2014"}</span> },
     {
       key: "actions", header: "", cell: (s: StockPurchase) => (
-        <div className="flex items-center gap-1 justify-end">
+        <div className="flex items-center gap-0.5 justify-end">
           <button onClick={() => openEdit(s)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors" title="Edit">
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -118,42 +118,44 @@ export default function Stock() {
   return (
     <div>
       <PageHeader title="Stock / Purchases" description="Track inventory purchases and stock levels" action={{ label: "New Purchase", onClick: openAdd }} />
-      <div className="mb-6">
+      
+      <div className="mb-5">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm text-text-secondary">Total Stock Value</p>
-                <p className="text-2xl font-bold text-text-primary">
-                  {showValue ? formatCurrency(totalValue) : "********"}
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">Total Stock Value</p>
+                <p className="text-xl font-bold text-text-primary tabular-nums">
+                  {showValue ? formatCurrency(totalValue) : "••••••••"}
                 </p>
               </div>
-              <button onClick={() => setShowValue(!showValue)} className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center text-accent hover:bg-accent/20 transition-colors" title={showValue ? "Hide value" : "Show value"}>
-                {showValue ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              <button onClick={() => setShowValue(!showValue)} className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent hover:bg-accent/20 transition-colors" title={showValue ? "Hide value" : "Show value"}>
+                {showValue ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </CardContent>
         </Card>
       </div>
-      <div className="rounded-xl border border-border overflow-x-auto">
+
+      <div className="rounded-lg border border-border">
         <DataTable columns={columns} data={stockEntries} loading={isLoading} keyExtractor={(s: StockPurchase) => s.id} />
       </div>
+
       <Dialog open={open} onOpenChange={(v) => { if (!v) { setEditingId(null); } setOpen(v); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{editingId ? "Edit Stock Purchase" : "Record Stock Purchase"}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div>
+          <div className="px-5 pb-5 space-y-3">
+            <div className="space-y-1">
               <Label>Product</Label>
                 <SearchableSelect
                   options={products.map((p: Product) => ({ value: p.id, label: `${p.name} — ${p.category || "No Category"}` }))}
                   value={form.productId}
                   onChange={(v) => setForm({ ...form, productId: v })}
                   placeholder="Select product"
-                  disabled={!!editingId}
                 />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              <div className="space-y-1">
                 <Label>Company</Label>
                 <SearchableSelect
                   options={companies.map((c: Company) => ({ value: c.id, label: c.name }))}
@@ -162,7 +164,7 @@ export default function Stock() {
                   placeholder="Select company"
                 />
               </div>
-              <div>
+              <div className="space-y-1">
                 <Label>Distributor</Label>
                 <SearchableSelect
                   options={distributors.map((d: Distributor) => ({ value: d.id, label: d.name }))}
@@ -172,15 +174,15 @@ export default function Stock() {
                 />
               </div>
             </div>
-            <div>
+            <div className="space-y-1">
               <Label>Invoice Number</Label>
               <Input value={form.invoiceNumber} onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })} placeholder="e.g. INV-001" />
             </div>
-            <div>
+            <div className="space-y-1">
               <Label>Quantity</Label>
               <Input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
             </div>
-            <div>
+            <div className="space-y-1">
               <Label>Expiry (optional)</Label>
               <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} min={new Date().toISOString().split("T")[0]} />
             </div>

@@ -50,7 +50,7 @@ export default function Topbar() {
   const isServer = window.appConfig?.mode === "server";
 
   return (
-    <header className="h-12 border-b border-border bg-surface/70 backdrop-blur-lg sticky top-0 z-30">
+    <header className="h-11 border-b border-border bg-surface/70 backdrop-blur-lg sticky top-0 z-30">
       <div className="flex items-center justify-between h-full px-5">
         <motion.div
           key={location.pathname}
@@ -58,31 +58,31 @@ export default function Topbar() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.15 }}
         >
-          <h1 className="text-sm font-semibold text-text-primary tracking-tight">{page.title}</h1>
-          <p className="text-[10px] text-text-secondary leading-none mt-px">{page.subtitle}</p>
+          <h1 className="text-xs font-display font-semibold text-text-primary tracking-tight">{page.title}</h1>
+          <p className="text-[9px] text-text-secondary leading-none mt-px">{page.subtitle}</p>
         </motion.div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2 h-6 rounded-md bg-muted text-[10px] text-text-secondary font-medium">
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 px-1.5 h-5 rounded bg-muted text-[9px] text-text-secondary font-medium">
             {isServer ? (
-              <Server className="h-3 w-3 text-accent" />
+              <Server className="h-2.5 w-2.5 text-accent" />
             ) : (
-              <Monitor className="h-3 w-3 text-muted-foreground" />
+              <Monitor className="h-2.5 w-2.5 text-muted-foreground" />
             )}
             <span>{isServer ? "Server" : "Client"}</span>
           </div>
 
-          <span className="text-[11px] text-text-secondary tabular-nums font-medium">{time}</span>
+          <span className="text-[10px] text-text-secondary tabular-nums font-mono font-medium">{time}</span>
 
-          <button className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted transition-all duration-150">
-            <Bell className="h-3.5 w-3.5" />
+          <button className="h-6 w-6 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted transition-all duration-150">
+            <Bell className="h-3 w-3" />
           </button>
 
           <button
             onClick={toggleDark}
-            className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted transition-all duration-150"
+            className="h-6 w-6 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted transition-all duration-150"
           >
-            {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            {dark ? <Sun className="h-3 w-3" /> : <Moon className="h-3 w-3" />}
           </button>
         </div>
       </div>

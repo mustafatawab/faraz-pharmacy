@@ -1,7 +1,5 @@
 import { motion } from "framer-motion";
-import { Package } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import type { Product } from "@/types";
 
 interface ProductCardProps {
@@ -19,26 +17,27 @@ export default function ProductCard({ product, onAdd }: ProductCardProps) {
       whileTap={outOfStock ? undefined : { scale: 0.99 }}
       onClick={() => !outOfStock && onAdd(product)}
       disabled={outOfStock}
-      className={`w-full text-left rounded-lg border bg-surface p-3.5 transition-all ${
+      className={`w-full text-left rounded-lg border bg-surface p-3.5 relative transition-all ${
         outOfStock
-          ? "border-danger/30 opacity-50 cursor-not-allowed"
+          ? "border-danger/20 opacity-50 cursor-not-allowed"
           : "border-border hover:border-accent/30 hover:shadow-sm cursor-pointer"
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-text-primary text-xs truncate">{product.name}</h3>
-          <p className="text-[10px] text-text-secondary mt-px truncate">{product.company}</p>
-        </div>
-        <div className="h-7 w-7 rounded-md bg-accent/10 flex items-center justify-center shrink-0">
-          <Package className="h-3.5 w-3.5 text-accent" />
-        </div>
+      <div className="flex items-center gap-1.5 mb-2">
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${
+            outOfStock ? "bg-danger" : lowStock ? "bg-warning" : "bg-success"
+          }`}
+        />
+        <span className="text-[9px] font-medium text-text-secondary tracking-wider">
+          {outOfStock ? "OUT OF STOCK" : lowStock ? `Only ${product.stock_qty} left` : "In Stock"}
+        </span>
       </div>
-      <div className="mt-2.5 flex items-center justify-between">
-        <span className="text-sm font-bold text-text-primary tabular-nums">{formatCurrency(product.sale_price)}</span>
-        <Badge variant={outOfStock ? "danger" : lowStock ? "danger" : "neutral"} className="text-[9px] px-1.5 py-px">
-          {outOfStock ? "Out" : `${product.stock_qty}`}
-        </Badge>
+      <h3 className="font-display font-semibold text-sm text-text-primary leading-tight">{product.name}</h3>
+      <p className="text-[10px] text-text-secondary mt-0.5 truncate">{product.company}</p>
+      <div className="mt-3 pt-2.5 border-t border-border flex items-center justify-between">
+        <span className="font-mono font-bold text-sm text-text-primary tabular-nums">{formatCurrency(product.sale_price)}</span>
+        <span className="text-[9px] text-text-secondary font-medium">{product.dosage || "1x"}</span>
       </div>
     </motion.button>
   );

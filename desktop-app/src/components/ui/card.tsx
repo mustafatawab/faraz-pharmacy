@@ -1,9 +1,22 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("rounded-xl border border-border bg-surface", className)} {...props} />
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  withEdge?: boolean;
+  edgeColor?: string;
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, withEdge, edgeColor, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "rounded-xl border border-border bg-surface relative",
+        withEdge && "border-l-2 border-l-accent/30 hover:border-l-accent transition-colors duration-200",
+        className
+      )}
+      {...props}
+    />
   )
 );
 Card.displayName = "Card";

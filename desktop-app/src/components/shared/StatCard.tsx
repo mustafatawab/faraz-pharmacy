@@ -56,8 +56,9 @@ export default function StatCard({ title, value, icon, trend, subtitle, loading,
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.35, ease: "easeOut" }}
       whileHover={{ y: -1 }}
-      className="group rounded-xl border border-border bg-surface p-4 hover:border-accent/20 hover:shadow-sm transition-all duration-200"
+      className="group rounded-xl border border-border bg-surface p-4 relative overflow-hidden hover:shadow-sm transition-all duration-200"
     >
+      <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-accent/20 group-hover:bg-accent transition-colors duration-200" />
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <p className="text-[11px] font-medium text-text-secondary tracking-wide uppercase">{title}</p>

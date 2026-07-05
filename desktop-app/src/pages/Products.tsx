@@ -379,15 +379,17 @@ export default function Products() {
   }
 
   const columns = [
-    { key: "barcode", header: "Barcode", cell: (p: Product) => <span className="font-mono text-xs text-text-secondary">{p.barcode}</span> },
+    { key: "barcode", header: "Barcode", cell: (p: Product) => <span className="font-mono text-[11px] text-text-secondary">{p.barcode}</span> },
     { key: "name", header: "Name", cell: (p: Product) => (
-      <span className={`font-medium ${p.active ? "text-text-primary" : "text-text-secondary line-through"}`}>{p.name}</span>
+      <span className={`text-xs ${p.active ? "font-medium text-text-primary" : "text-text-secondary line-through"}`}>{p.name}</span>
     ) },
-    { key: "category", header: "Category", cell: (p: Product) => <span className="text-xs text-text-secondary bg-surface-2 px-2 py-0.5 rounded-full">{p.category || "\u2014"}</span> },
-    { key: "location", header: "Location", cell: (p: Product) => <span className="text-xs font-mono text-text-secondary">{p.location || "\u2014"}</span> },
-    { key: "salePrice", header: "Sale Price", cell: (p: Product) => <span className="font-mono font-medium">{formatCurrency(p.sale_price)}</span> },
+    { key: "category", header: "Category", cell: (p: Product) => (
+      <span className="text-[10px] text-text-secondary bg-surface-2 px-1.5 py-0.5 rounded">{p.category || "\u2014"}</span>
+    ) },
+    { key: "location", header: "Location", cell: (p: Product) => <span className="text-[11px] font-mono text-text-secondary">{p.location || "\u2014"}</span> },
+    { key: "salePrice", header: "Sale Price", cell: (p: Product) => <span className="font-mono text-xs font-semibold">{formatCurrency(p.sale_price)}</span> },
     { key: "stockQty", header: "Stock", cell: (p: Product) => (
-      <span className={`font-mono font-medium ${p.stock_qty <= 5 ? "text-danger" : p.active ? "text-text-primary" : "text-text-secondary"}`}>{p.stock_qty}</span>
+      <span className={`font-mono text-xs font-semibold ${p.stock_qty <= 5 ? "text-danger" : p.active ? "text-text-primary" : "text-text-secondary"}`}>{p.stock_qty}</span>
     ) },
     { key: "status", header: "Status", cell: (p: Product) => {
       if (!p.active) return <StatusBadge status="inactive" />;
@@ -396,7 +398,7 @@ export default function Products() {
     } },
     {
       key: "actions", header: "", cell: (p: Product) => (
-        <div className="flex items-center gap-1 justify-end">
+        <div className="flex items-center gap-0.5 justify-end">
           {p.active ? (
             <>
               <button onClick={() => openEdit(p)} className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors" title="Edit">
@@ -425,10 +427,10 @@ export default function Products() {
       />
 
       {addedId && (
-        <div className="mb-4 p-4 rounded-xl border border-success/20 bg-success/5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="h-2 w-2 rounded-full bg-success" />
-            <p className="text-sm text-text-primary">Product added successfully</p>
+        <div className="mb-4 p-3 rounded-lg border border-success/20 bg-success/5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+            <p className="text-xs text-text-primary font-medium">Product added successfully</p>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => { setAddedId(null); openAdd(); }}>Add Another</Button>
@@ -437,57 +439,61 @@ export default function Products() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-          <Input placeholder="Search by name, barcode, category, or location..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary" />
+          <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
         </div>
-        <Button variant="outline" size="sm" className={showArchived ? "border-accent text-accent" : ""} onClick={() => setShowArchived(!showArchived)}>
-          <Archive className="h-4 w-4 mr-1.5" />
-          Archived
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadCSV(`products_${new Date().toISOString().split("T")[0]}.csv`, ["Barcode","Name","Company","Category","Location","Sale Price","Purchase Price","Stock","Expiry","Status"], filtered.map((p: Product) => [p.barcode, p.name, p.company, p.category, p.location, p.sale_price, p.purchase_price, p.stock_qty, p.expiry||"", p.active?"Active":"Archived"]))}>
-          <Download className="h-4 w-4 mr-1" /> CSV
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadPDF(`products_${new Date().toISOString().split("T")[0]}.pdf`, "Products List", ["Barcode","Name","Company","Category","Location","Sale Price","Purchase Price","Stock","Expiry","Status"], filtered.map((p: Product) => [p.barcode, p.name, p.company, p.category, p.location, p.sale_price, p.purchase_price, p.stock_qty, p.expiry||"", p.active?"Active":"Archived"]))}>
-          <Download className="h-4 w-4 mr-1" /> PDF
-        </Button>
-        <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
-        <Button variant="default" size="sm" className="bg-success hover:bg-success/90 text-white" onClick={() => { setImportOpen(true); setImportRows([]); }}>
-          <Upload className="h-4 w-4 mr-1" /> Import CSV
-        </Button>
+        <div className="flex items-center gap-1.5 ml-auto">
+          <Button variant="outline" size="sm" className={showArchived ? "border-accent text-accent" : ""} onClick={() => setShowArchived(!showArchived)}>
+            <Archive className="h-3.5 w-3.5 mr-1" />
+            Archived
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => downloadCSV(`products_${new Date().toISOString().split("T")[0]}.csv`, ["Barcode","Name","Company","Category","Location","Sale Price","Purchase Price","Stock","Expiry","Status"], filtered.map((p: Product) => [p.barcode, p.name, p.company, p.category, p.location, p.sale_price, p.purchase_price, p.stock_qty, p.expiry||"", p.active?"Active":"Archived"]))}>
+            <Download className="h-3.5 w-3.5 mr-1" /> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => downloadPDF(`products_${new Date().toISOString().split("T")[0]}.pdf`, "Products List", ["Barcode","Name","Company","Category","Location","Sale Price","Purchase Price","Stock","Expiry","Status"], filtered.map((p: Product) => [p.barcode, p.name, p.company, p.category, p.location, p.sale_price, p.purchase_price, p.stock_qty, p.expiry||"", p.active?"Active":"Archived"]))}>
+            <Download className="h-3.5 w-3.5 mr-1" /> PDF
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
+          <Button variant="primary" size="sm" onClick={() => { setImportOpen(true); setImportRows([]); }}>
+            <Upload className="h-3.5 w-3.5 mr-1" /> Import CSV
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-xl border border-border">
+      <div className="rounded-lg border border-border">
         <DataTable columns={columns} data={filtered} loading={isLoading} keyExtractor={(p: Product) => p.id} />
       </div>
 
       <Dialog open={importOpen} onOpenChange={(v) => { if (!v) { setImportRows([]); } setImportOpen(v); }}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Import Products from CSV</DialogTitle>
+            <DialogTitle>Import Products</DialogTitle>
           </DialogHeader>
           {importRows.length === 0 ? (
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              className="border-2 border-dashed border-border rounded-xl p-10 flex flex-col items-center justify-center gap-4 text-center cursor-pointer hover:border-accent/50 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="h-10 w-10 text-text-secondary" />
-              <div>
-                <p className="text-sm font-medium text-text-primary">Drag & drop your CSV file here</p>
-                <p className="text-xs text-text-secondary mt-1">or click to browse files</p>
+            <div className="px-5 pb-5">
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:border-accent/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-8 w-8 text-text-secondary" />
+                <div>
+                  <p className="text-xs font-medium text-text-primary">Drag & drop your CSV file here</p>
+                  <p className="text-[11px] text-text-secondary mt-0.5">or click to browse files</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); downloadSampleCsv(); }}>
+                  <Download className="h-3.5 w-3.5 mr-1" /> Download Sample
+                </Button>
+                <p className="text-[10px] text-text-secondary/60">Supports: barcode, name, purchase price, sale price, category, location, expiry</p>
               </div>
-              <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); downloadSampleCsv(); }}>
-                <Download className="h-4 w-4 mr-1" /> Download Sample CSV
-              </Button>
-              <p className="text-[10px] text-text-secondary/60">Supports: barcode, name, purchase price, sale price, category, location, expiry</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="px-5 pb-5 space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-text-secondary">
+                <p className="text-xs text-text-secondary">
                   {importRows.length} product(s) found
                 </p>
                 <Button variant="ghost" size="sm" onClick={() => { setImportRows([]); }}>
@@ -495,37 +501,35 @@ export default function Products() {
                 </Button>
               </div>
               {importRows.some((r) => r.error) && (
-                <div className="p-3 rounded-lg bg-danger/5 border border-danger/20 text-xs text-danger">
+                <div className="p-2.5 rounded-lg bg-danger/5 border border-danger/20 text-[11px] text-danger">
                   {importRows.filter((r) => r.error).length} row(s) have errors and will be skipped
                 </div>
               )}
-              <div className="max-h-60 overflow-y-auto rounded-lg border border-border">
-                <table className="w-full text-xs">
+              <div className="max-h-60 overflow-y-auto rounded-lg border border-border text-xs">
+                <table className="w-full">
                   <thead>
                     <tr className="bg-surface-2">
-                      <th className="text-left p-2 font-medium">#</th>
-                      <th className="text-left p-2 font-medium">Barcode</th>
-                      <th className="text-left p-2 font-medium">Name</th>
-                      <th className="text-left p-2 font-medium">Purchase</th>
-                      <th className="text-left p-2 font-medium">Sale</th>
-                      <th className="text-left p-2 font-medium">Category</th>
-                      <th className="text-left p-2 font-medium">Status</th>
+                      <th className="text-left p-2 font-medium text-text-secondary text-[10px] uppercase tracking-wider">#</th>
+                      <th className="text-left p-2 font-medium text-text-secondary text-[10px] uppercase tracking-wider">Barcode</th>
+                      <th className="text-left p-2 font-medium text-text-secondary text-[10px] uppercase tracking-wider">Name</th>
+                      <th className="text-left p-2 font-medium text-text-secondary text-[10px] uppercase tracking-wider">Purchase</th>
+                      <th className="text-left p-2 font-medium text-text-secondary text-[10px] uppercase tracking-wider">Sale</th>
+                      <th className="text-left p-2 font-medium text-text-secondary text-[10px] uppercase tracking-wider">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {importRows.slice(0, 50).map((row, i) => (
                       <tr key={i} className={`border-t border-border ${row.error ? "bg-danger/5" : ""}`}>
                         <td className="p-2 text-text-secondary">{row.rowNum}</td>
-                        <td className="p-2 font-mono">{row.barcode}</td>
-                        <td className="p-2">{row.name}</td>
-                        <td className="p-2">{row.purchasePrice}</td>
-                        <td className="p-2">{row.salePrice || "\u2014"}</td>
-                        <td className="p-2">{row.category || "\u2014"}</td>
+                        <td className="p-2 font-mono text-text-primary">{row.barcode}</td>
+                        <td className="p-2 text-text-primary font-medium">{row.name}</td>
+                        <td className="p-2 text-text-secondary">{row.purchasePrice}</td>
+                        <td className="p-2 text-text-secondary">{row.salePrice || "\u2014"}</td>
                         <td className="p-2">
                           {row.error ? (
-                            <span className="text-danger" title={row.error}>Error</span>
+                            <span className="text-danger text-[10px]" title={row.error}>Error</span>
                           ) : (
-                            <span className="text-success">Valid</span>
+                            <span className="text-success text-[10px]">Valid</span>
                           )}
                         </td>
                       </tr>
@@ -533,7 +537,7 @@ export default function Products() {
                   </tbody>
                 </table>
                 {importRows.length > 50 && (
-                  <p className="text-center text-text-secondary p-2 text-xs">...and {importRows.length - 50} more</p>
+                  <p className="text-center text-text-secondary p-2 text-[10px]">...and {importRows.length - 50} more</p>
                 )}
               </div>
               <Button className="w-full" disabled={importImporting || importRows.length === 0} onClick={handleImport}>
@@ -552,8 +556,8 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Product" : "Add Product"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
-            <div>
+          <div className="px-5 pb-5 space-y-3 max-h-[65vh] overflow-y-auto">
+            <div className="space-y-1">
               <Label>Barcode</Label>
               <Input
                 ref={barcodeInputRef}
@@ -562,15 +566,15 @@ export default function Products() {
                 className="font-mono"
               />
               {barcodeExists && (
-                <p className="text-xs text-danger mt-1">{barcodeExists}</p>
+                <p className="text-[11px] text-danger mt-0.5">{barcodeExists}</p>
               )}
             </div>
-            <div>
+            <div className="space-y-1">
               <Label>Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              <div className="space-y-1">
                 <Label>Category</Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
@@ -581,17 +585,17 @@ export default function Products() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="space-y-1">
                 <Label>Location</Label>
                 <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Shelf A1" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              <div className="space-y-1">
                 <Label>Purchase Price</Label>
                 <Input type="number" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
               </div>
-              <div>
+              <div className="space-y-1">
                 <Label>Sale Price</Label>
                 <Input type="number" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} />
               </div>
@@ -599,13 +603,13 @@ export default function Products() {
 
             <div className="border border-border rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Additional Price Tiers</Label>
+                <Label className="text-xs font-medium">Additional Price Tiers</Label>
                 <Button type="button" variant="outline" size="sm" onClick={addPriceTier} className="h-7 gap-1">
-                  <Plus className="h-3.5 w-3.5" /> Add Tier
+                  <Plus className="h-3 w-3" /> Add Tier
                 </Button>
               </div>
               {form.prices.length === 0 && (
-                <p className="text-xs text-text-secondary">No additional prices. Click "Add Tier" to add more purchase/sale price pairs.</p>
+                <p className="text-[11px] text-text-secondary">No additional prices.</p>
               )}
               {form.prices.map((pt, i) => (
                 <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-surface-2">
@@ -616,7 +620,7 @@ export default function Products() {
                         value={pt.label}
                         onChange={(e) => updatePriceTier(i, "label", e.target.value)}
                         placeholder="e.g. Wholesale"
-                        className="h-8 text-xs"
+                        className="h-7 text-[11px]"
                       />
                     </div>
                     <div>
@@ -625,7 +629,7 @@ export default function Products() {
                         type="number"
                         value={pt.purchasePrice}
                         onChange={(e) => updatePriceTier(i, "purchasePrice", e.target.value)}
-                        className="h-8 text-xs"
+                        className="h-7 text-[11px]"
                       />
                     </div>
                     <div>
@@ -634,26 +638,26 @@ export default function Products() {
                         type="number"
                         value={pt.salePrice}
                         onChange={(e) => updatePriceTier(i, "salePrice", e.target.value)}
-                        className="h-8 text-xs"
+                        className="h-7 text-[11px]"
                       />
                     </div>
                   </div>
                   <button
                     onClick={() => removePriceTier(i)}
-                    className="h-8 w-8 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors mt-5 shrink-0"
+                    className="h-7 w-7 rounded-md flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/5 transition-colors mt-4 shrink-0"
                     title="Remove tier"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
               ))}
             </div>
 
-            <div>
+            <div className="space-y-1">
               <Label>Expiry (optional)</Label>
               <Input type="date" value={form.expiry} onChange={(e) => setForm({ ...form, expiry: e.target.value })} min={new Date().toISOString().split("T")[0]} />
             </div>
-            <Button className="w-full mt-2" disabled={!form.name || !form.purchasePrice || createMutation.isPending || updateMutation.isPending}
+            <Button className="w-full mt-1" disabled={!form.name || !form.purchasePrice || createMutation.isPending || updateMutation.isPending}
               onClick={() => editingId ? updateMutation.mutate() : createMutation.mutate()}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingId ? "Update Product" : "Add Product"}
             </Button>

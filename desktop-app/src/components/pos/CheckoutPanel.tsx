@@ -2,7 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ShoppingCart, Trash2, UserPlus, User } from "lucide-react";
+import { ShoppingCart, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,24 +93,27 @@ export default function CheckoutPanel({
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-          <ShoppingCart className="h-5 w-5 text-accent" />
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <ShoppingCart className="h-4 w-4 text-accent" />
           Cart
+          {items.length > 0 && (
+            <span className="text-[10px] font-normal text-text-secondary bg-surface-2 rounded-full px-1.5 py-px">{items.length}</span>
+          )}
         </h2>
         {items.length > 0 && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-text-secondary hover:text-danger" onClick={onClearCart}>
-            <Trash2 className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-text-secondary hover:text-danger" onClick={onClearCart}>
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
 
-      <ScrollArea className="flex-1 -mx-5 px-5">
+      <ScrollArea className="flex-1 -mx-4 px-4">
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-sm text-text-secondary py-12">
-            <ShoppingCart className="h-12 w-12 text-border mb-3" />
-            <p>Cart is empty</p>
-            <p className="text-xs mt-1">Scan or search products to add</p>
+          <div className="flex flex-col items-center justify-center h-full text-xs text-text-secondary py-16">
+            <ShoppingCart className="h-10 w-10 text-border mb-3" />
+            <p className="font-medium">Cart is empty</p>
+            <p className="text-[11px] mt-0.5">Scan or search products to add</p>
           </div>
         ) : (
           <div>
@@ -122,7 +125,7 @@ export default function CheckoutPanel({
       </ScrollArea>
 
       {items.length > 0 && (
-        <div className="pt-4 space-y-3">
+        <div className="pt-3 space-y-3">
           <div className="flex items-center gap-2">
             <div className="flex-1">
               <SearchableSelect
@@ -133,11 +136,10 @@ export default function CheckoutPanel({
                   onCustomerChange(v || undefined, selected?.name);
                 }}
                 placeholder="Customer (optional)"
-                className="h-8 text-xs"
               />
             </div>
             <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setQuickAddOpen(true)} title="Quick add customer">
-              <UserPlus className="h-4 w-4" />
+              <UserPlus className="h-3.5 w-3.5" />
             </Button>
           </div>
           <Separator />
@@ -145,16 +147,16 @@ export default function CheckoutPanel({
           <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
             <DialogContent>
               <DialogHeader><DialogTitle>Quick Add Customer</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div>
+              <div className="px-5 pb-5 space-y-3">
+                <div className="space-y-1">
                   <Label>Name</Label>
                   <Input value={quickName} onChange={(e) => setQuickName(e.target.value)} />
                 </div>
-                <div>
+                <div className="space-y-1">
                   <Label>Phone</Label>
                   <Input value={quickPhone} onChange={(e) => setQuickPhone(e.target.value)} />
                 </div>
-                <div>
+                <div className="space-y-1">
                   <Label>Address</Label>
                   <Input value={quickAddress} onChange={(e) => setQuickAddress(e.target.value)} />
                 </div>
@@ -164,11 +166,12 @@ export default function CheckoutPanel({
               </div>
             </DialogContent>
           </Dialog>
+          
           <div>
             <div className="flex items-center gap-2">
               <button
                 onClick={onToggleDiscountType}
-                className="h-7 px-2 rounded-md text-xs font-medium border border-border bg-surface-2 hover:bg-border transition-colors shrink-0"
+                className="h-7 px-2 rounded-md text-[10px] font-medium border border-border bg-surface-2 hover:bg-border transition-colors shrink-0"
               >
                 {discountType === "pkr" ? "PKR" : "%"}
               </button>
@@ -177,35 +180,31 @@ export default function CheckoutPanel({
                 placeholder={`Discount (${discountType === "pkr" ? "PKR" : "%"})`}
                 value={discountValue || ""}
                 onChange={(e) => onDiscountChange(Number(e.target.value) || 0)}
-                className="h-8 text-sm font-mono"
+                className="h-7 text-xs font-mono"
               />
             </div>
-            {discountValue > 0 && discountType === "percent" && (
-              <p className="text-xs text-text-secondary text-right mt-1">
-                = {formatCurrency(discount)}
-              </p>
-            )}
-            {discountValue > 0 && discountType === "pkr" && subtotal > 0 && (
-              <p className="text-xs text-text-secondary text-right mt-1">
-                = {Math.round(discountValue * 100 / subtotal)}%
+            {discountValue > 0 && (
+              <p className="text-[10px] text-text-secondary text-right mt-0.5">
+                {discountType === "percent" ? `= ${formatCurrency(discount)}` : `= ${Math.round(discountValue * 100 / subtotal)}%`}
               </p>
             )}
           </div>
-          <div className="space-y-1.5 text-sm">
+
+          <div className="space-y-1 text-xs">
             <div className="flex justify-between text-text-secondary">
               <span>Subtotal</span>
-              <span className="font-mono">{formatCurrency(subtotal)}</span>
+              <span className="font-mono tabular-nums">{formatCurrency(subtotal)}</span>
             </div>
             {discount > 0 && (
               <div className="flex justify-between text-success">
                 <span>Discount</span>
-                <span className="font-mono">-{formatCurrency(discount)}</span>
+                <span className="font-mono tabular-nums">-{formatCurrency(discount)}</span>
               </div>
             )}
             <Separator />
-            <div className="flex justify-between text-base font-bold text-text-primary">
+            <div className="flex justify-between text-sm font-bold text-text-primary pt-0.5">
               <span>Total</span>
-              <span className="font-mono">{formatCurrency(total)}</span>
+              <span className="font-mono tabular-nums">{formatCurrency(total)}</span>
             </div>
           </div>
 
@@ -215,13 +214,13 @@ export default function CheckoutPanel({
               placeholder="Amount paid"
               value={amountPaid}
               onChange={(e) => setAmountPaid(e.target.value)}
-              className="h-12 text-lg font-mono font-bold text-center"
+              className="h-10 text-base font-mono font-bold text-center"
             />
             {change > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: -5 }}
+                initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-center text-sm text-success font-medium"
+                className="text-center text-xs text-success font-semibold"
               >
                 Change: {formatCurrency(change)}
               </motion.div>
@@ -233,26 +232,26 @@ export default function CheckoutPanel({
                   checked={addToArrears}
                   onCheckedChange={(val) => setAddToArrears(val === true)}
                 />
-                <Label htmlFor="add-to-arrears" className="text-xs cursor-pointer">
-                  Add Remaining Amount in Arears
+                <Label htmlFor="add-to-arrears" className="text-[11px] cursor-pointer text-text-secondary">
+                  Add remaining to arrears
                 </Label>
               </div>
             )}
             <Button
-              className="w-full h-12 text-base gap-2"
+              className="w-full h-10 text-sm gap-2"
               disabled={!canPay || processing}
               onClick={handleCheckout}
             >
               {processing ? "Processing..." : `Pay ${formatCurrency(total)}`}
             </Button>
             {isPartial && !customerId && (
-              <p className="text-xs text-center text-danger">Select a customer for partial payment</p>
+              <p className="text-[10px] text-center text-danger">Select a customer for partial payment</p>
             )}
             {isPartial && !!customerId && !addToArrears && (
-              <p className="text-xs text-center text-text-secondary">Check the box above to add remaining amount to arrears</p>
+              <p className="text-[10px] text-center text-text-secondary">Check the box above to add remaining to arrears</p>
             )}
             {error && (
-              <p className="text-xs text-center text-danger">{error}</p>
+              <p className="text-[10px] text-center text-danger">{error}</p>
             )}
           </div>
         </div>
