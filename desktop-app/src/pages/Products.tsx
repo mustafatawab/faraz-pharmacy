@@ -18,17 +18,29 @@ import type { Product, ProductPriceInput, Category } from "@/types";
 
 interface CsvRow {
   rowNum: number; barcode: string; name: string; category: string; location: string;
-  purchasePrice: string; salePrice: string; expiry: string; error?: string;
+  purchasePrice: string; salePrice: string; expiry: string; company: string; packSize: string; error?: string;
+}
+
+interface ImportRowResult {
+  rowNum: number; barcode: string; name: string; status: "pending" | "completed" | "rejected"; message?: string;
 }
 
 const HEADER_LOOKUP: Record<string, string> = {
   "barcode": "barcode", "bar code": "barcode", "code": "barcode", "baar code": "barcode", "baarcode": "barcode",
+  "product code": "barcode", "item code": "barcode", "sku": "barcode", "upc": "barcode", "ean": "barcode",
   "name": "name", "product name": "name", "medicine": "name", "medicine name": "name", "item": "name", "item name": "name",
+  "product": "name", "description": "name", "drug name": "name", "medication": "name",
   "purchased price": "purchasePrice", "purchasedprice": "purchasePrice", "purchase price": "purchasePrice",
   "purchaseprice": "purchasePrice", "price": "purchasePrice", "purchase": "purchasePrice",
+  "cost price": "purchasePrice", "cost": "purchasePrice", "buying price": "purchasePrice", "buy price": "purchasePrice",
   "sale price": "salePrice", "saleprice": "salePrice", "selling price": "salePrice", "retail price": "salePrice", "retail": "salePrice",
-  "category": "category", "location": "location",
-  "expiry date": "expiry", "expiry time": "expiry", "expiry": "expiry",
+  "sales price": "salePrice", "sell price": "salePrice", "unit price": "salePrice", "mrp": "salePrice", "price retail": "salePrice",
+  "category": "category", "categories": "category", "cat": "category", "section": "category", "type": "category", "class": "category",
+  "location": "location", "loc": "location", "shelf": "location", "rack": "location", "position": "location", "storage": "location",
+  "expiry date": "expiry", "expiry time": "expiry", "expiry": "expiry", "exp": "expiry", "expiration": "expiry", "exp date": "expiry", "use by": "expiry",
+  "company": "company", "manufacturer": "company", "brand": "company", "company name": "company", "vendor": "company", "supplier": "company",
+  "pack size": "packSize", "packsize": "packSize", "units per pack": "packSize", "quantity per pack": "packSize", "pack qty": "packSize",
+  "tablets per pack": "packSize", "pack": "packSize", "per pack": "packSize",
 };
 
 interface PriceTierForm {
@@ -63,6 +75,9 @@ export default function Products() {
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState<CsvRow[]>([]);
   const [importImporting, setImportImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
+  const [importResults, setImportResults] = useState<ImportRowResult[]>([]);
+  const [importResultsOpen, setImportResultsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -297,6 +312,8 @@ export default function Products() {
         category: hasHeader(headerMap, "category") ? cols[findIndex(headerMap, "category")]?.trim() || "" : "",
         location: hasHeader(headerMap, "location") ? cols[findIndex(headerMap, "location")]?.trim() || "" : "",
         expiry: hasHeader(headerMap, "expiry") ? cols[findIndex(headerMap, "expiry")]?.trim() || "" : "",
+        company: hasHeader(headerMap, "company") ? cols[findIndex(headerMap, "company")]?.trim() || "" : "",
+        packSize: hasHeader(headerMap, "packSize") ? cols[findIndex(headerMap, "packSize")]?.trim() || "" : "",
       };
       const rowErrors: string[] = [];
       if (!row.barcode) rowErrors.push("Missing barcode");
@@ -373,10 +390,10 @@ export default function Products() {
   }
 
   function downloadSampleCsv() {
-    const sample = `Barcode,Product Name,Purchase Price,Sale Price,Category,Location,Expiry
-123456,Panadol 500mg,80,100,Tablets,Shelf A1,2027-12-31
-123457,Brufen 400mg,120,150,Capsules,Shelf B2,2028-06-15
-123458,Augmentin 1g,250,300,Tablets,Shelf A3,2027-09-01`;
+    const sample = `Barcode,Product Name,Purchase Price,Sale Price,Category,Location,Expiry,Company,Pack Size
+123456,Panadol 500mg,80,100,Tablets,Shelf A1,2027-12-31,GSK,10
+123457,Brufen 400mg,120,150,Capsules,Shelf B2,2028-06-15,Abbott,20
+123458,Augmentin 1g,250,300,Tablets,Shelf A3,2027-09-01,GSK,14`;
     const blob = new Blob(["\uFEFF" + sample], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -388,39 +405,52 @@ export default function Products() {
 
   async function handleImport() {
     setImportImporting(true);
-    let success = 0;
-    let failed = 0;
-    const failDetails: string[] = [];
-    for (const row of importRows) {
+    setImportProgress({ done: 0, total: importRows.length });
+    const results: ImportRowResult[] = importRows.map((row) => ({
+      rowNum: row.rowNum, barcode: row.barcode, name: row.name,
+      status: "pending" as const,
+    }));
+    setImportResults(results);
+    setImportOpen(false);
+
+    for (let i = 0; i < importRows.length; i++) {
+      const row = importRows[i];
       if (row.error) {
-        failed++;
-        failDetails.push(`Row ${row.rowNum}: ${row.error}`);
+        results[i] = { ...results[i], status: "rejected", message: row.error };
+        setImportProgress((p) => ({ ...p, done: p.done + 1 }));
+        setImportResults([...results]);
         continue;
       }
       try {
         await api.products.create({
           barcode: row.barcode,
           name: row.name,
+          company: row.company || undefined,
           category: row.category || undefined,
           location: row.location || undefined,
           purchasePrice: Number(row.purchasePrice),
           salePrice: Number(row.salePrice) || 0,
           expiry: row.expiry || undefined,
+          packSize: row.packSize ? Number(row.packSize) : undefined,
         });
-        success++;
+        results[i] = { ...results[i], status: "completed" };
       } catch (err) {
-        failed++;
-        failDetails.push(`Row ${row.rowNum}: ${err instanceof Error ? err.message : "API error"}`);
+        results[i] = { ...results[i], status: "rejected", message: err instanceof Error ? err.message : "API error" };
       }
+      setImportProgress((p) => ({ ...p, done: p.done + 1 }));
+      setImportResults([...results]);
     }
+
     setImportImporting(false);
-    setImportOpen(false);
     setImportRows([]);
     queryClient.invalidateQueries({ queryKey: ["products"] });
+
+    const completed = results.filter((r) => r.status === "completed").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
     if (failed === 0) {
-      toast.success(`${success} products imported successfully`);
+      toast.success(`${completed} products imported successfully`);
     } else {
-      toast.error(`${success} imported, ${failed} failed\n${failDetails.slice(0, 5).join("\n")}${failDetails.length > 5 ? `\n...and ${failDetails.length - 5} more` : ""}`);
+      toast.error(`${completed} imported, ${failed} failed`);
     }
   }
 
@@ -573,7 +603,7 @@ export default function Products() {
                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); downloadSampleCsv(); }}>
                   <Download className="h-3.5 w-3.5 mr-1" /> Download Sample
                 </Button>
-                <p className="text-[10px] text-text-secondary/60">Supports: barcode, name, purchase price, sale price, category, location, expiry</p>
+                <p className="text-[10px] text-text-secondary/60">Supports: barcode, name, purchase price, sale price, category, location, expiry, company, pack size</p>
               </div>
             </div>
           ) : (
@@ -616,7 +646,38 @@ export default function Products() {
                             <span className="text-danger text-[10px]" title={row.error}>Error</span>
                           ) : (
                             <span className="text-success text-[10px]">Valid</span>
-                          )}
+      )}
+
+      {importImporting && (
+        <div className="mb-4 p-3 rounded-lg border border-accent/20 bg-accent/5">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-text-primary">
+              Importing products... {importProgress.done} / {importProgress.total}
+            </p>
+            <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setImportResultsOpen(true)}>
+              View Details
+            </Button>
+          </div>
+          <div className="h-1.5 rounded-full bg-border overflow-hidden">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-300"
+              style={{ width: `${importProgress.total > 0 ? (importProgress.done / importProgress.total) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {!importImporting && importResults.length > 0 && (
+        <div className="mb-4 p-3 rounded-lg border border-border bg-surface-2 flex items-center justify-between">
+          <p className="text-xs text-text-secondary">
+            Last import: {importResults.filter((r) => r.status === "completed").length} completed,{" "}
+            {importResults.filter((r) => r.status === "rejected").length} failed
+          </p>
+          <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setImportResultsOpen(true)}>
+            View Details
+          </Button>
+        </div>
+      )}
                         </td>
                       </tr>
                     ))}
@@ -816,6 +877,45 @@ export default function Products() {
         onConfirm={() => { if (catDeleteId) catDeleteMutation.mutate(catDeleteId); }}
         loading={catDeleteMutation.isPending}
       />
+
+      <Dialog open={importResultsOpen} onOpenChange={(v) => { if (!v) setImportResultsOpen(v); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Results</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 pb-5 max-h-80 overflow-y-auto space-y-1">
+            {importResults.length === 0 ? (
+              <p className="text-xs text-text-secondary text-center py-4">No import data.</p>
+            ) : (
+              importResults.map((r, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs ${
+                    r.status === "completed"
+                      ? "border-success/20 bg-success/5"
+                      : r.status === "rejected"
+                      ? "border-danger/20 bg-danger/5"
+                      : "border-border bg-surface-2"
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-text-primary truncate block">{r.name}</span>
+                    <span className="font-mono text-[10px] text-text-secondary">{r.barcode}</span>
+                  </div>
+                  <div className="shrink-0 ml-2 text-right">
+                    <span className={`text-[10px] font-medium ${
+                      r.status === "completed" ? "text-success" : r.status === "rejected" ? "text-danger" : "text-text-secondary"
+                    }`}>
+                      {r.status === "completed" ? "Done" : r.status === "rejected" ? "Failed" : "Pending"}
+                    </span>
+                    {r.message && <p className="text-[9px] text-danger mt-0.5 max-w-[200px] truncate" title={r.message}>{r.message}</p>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
