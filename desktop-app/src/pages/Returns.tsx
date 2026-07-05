@@ -143,7 +143,7 @@ export default function Returns() {
       }}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New Return</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+          <div className="px-5 pb-5 space-y-4">
             <div>
               <Label>Select Date</Label>
               <Input type="date" value={selectedDate} onChange={(e) => { setSelectedDate(e.target.value); setSelectedSaleId(""); setReturnQtys({}); }} />

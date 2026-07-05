@@ -180,7 +180,7 @@ export default function Arrears() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Arrear</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="px-5 pb-5 space-y-3">
             <div>
               <Label>Customer</Label>
               <SearchableSelect
@@ -215,7 +215,7 @@ export default function Arrears() {
             </DialogTitle>
             <DialogDescription>Enter your admin password to confirm this action.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="px-5 pb-5 space-y-3">
             <div>
               <Input
                 type="password"

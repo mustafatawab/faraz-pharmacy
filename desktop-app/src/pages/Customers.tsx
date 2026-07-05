@@ -249,7 +249,7 @@ export default function Customers() {
             </DialogDescription>
           </DialogHeader>
           {deleteInfo && (
-            <div className="space-y-2 text-sm">
+            <div className="px-5 pb-5 space-y-2 text-sm">
               <p className="font-medium text-text-primary">{deleteTarget?.name}</p>
               <ul className="space-y-1 text-text-secondary">
                 {deleteInfo.salesCount > 0 && <li>• {deleteInfo.salesCount} invoice(s) — customer reference will be removed</li>}
@@ -272,7 +272,7 @@ export default function Customers() {
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Customer" : "Add Customer"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="px-5 pb-5 space-y-3">
             <div>
               <Label>Name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} />
