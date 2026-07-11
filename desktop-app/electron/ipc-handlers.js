@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { loadConfig, saveConfig, getBackupsDir } = require("./config");
-const { printReceipt, printReturnReceipt } = require("./printer");
+const { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters } = require("./printer");
 
 function getLocalIp() {
   const ifaces = os.networkInterfaces();
@@ -73,6 +73,14 @@ function registerHandlers() {
     return { success: true };
   });
 
+  ipcMain.handle("usb-printers:list", async () => {
+    try {
+      return await listUSBPrinters();
+    } catch {
+      return [];
+    }
+  });
+
   ipcMain.handle("print:receipt", async (_, sale, printerConfig) => {
     try {
       await printReceipt(sale, printerConfig);
@@ -85,6 +93,15 @@ function registerHandlers() {
   ipcMain.handle("print:return-receipt", async (_, returnData, sale, printerConfig) => {
     try {
       await printReturnReceipt(returnData, sale, printerConfig);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("print:barcode-label", async (_, barcode, productName, price, copies) => {
+    try {
+      await printBarcodeLabel(barcode, productName, price, copies);
       return { success: true };
     } catch (e) {
       return { success: false, error: e.message };

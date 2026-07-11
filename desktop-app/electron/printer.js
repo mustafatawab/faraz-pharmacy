@@ -948,7 +948,7 @@ function generateESCPOSReturnReceipt(returnData, sale) {
   return Buffer.concat(parts);
 }
 
-async function findUSBPrinter() {
+async function findUSBPrinter(interfaceClass) {
   const devices = await usb.getDevices();
   for (const d of devices) {
     try {
@@ -956,7 +956,7 @@ async function findUSBPrinter() {
       if (!configs || configs.length === 0) continue;
       for (const cfg of configs) {
         for (const iface of cfg.interfaces) {
-          if (iface.alternate && iface.alternate.interfaceClass === 7) {
+          if (iface.alternate && iface.alternate.interfaceClass === (interfaceClass || 7)) {
             return d;
           }
         }
@@ -980,6 +980,75 @@ async function doUSBPrint(dataBuffer) {
   if (result.status !== "ok") {
     throw new Error("USB write failed: " + result.status);
   }
+}
+
+function generateZebraPrintScript(zpl, usbPath) {
+  return `
+const usb = require(${JSON.stringify(usbPath)}).usb;
+(async () => {
+  const devices = await usb.getDevices();
+  const d = devices.find(x => x.vendorId === 2655 && x.productId === 343);
+  if (!d) { console.error("Zebra not found"); process.exit(1); }
+  await d.open();
+  try { await d.detachKernelDriver(0); } catch (_) {}
+  await d.claimInterface(0);
+  const r = await d.transferOut(1, Buffer.from(${JSON.stringify(zpl)}, "latin1"));
+  d.close();
+  if (r.status !== "ok") { console.error("USB write failed"); process.exit(1); }
+  console.log("ok");
+})().catch(e => { console.error(e.message); process.exit(1); });
+`;
+}
+
+async function doUSBZPLPrint(dataBuffer) {
+  const zpl = dataBuffer.toString("latin1");
+  const usbPath = require.resolve("usb");
+  const script = generateZebraPrintScript(zpl, usbPath);
+  const scriptFile = path.join(app.getPath("temp"), `zebra-print-${Date.now()}.cjs`);
+  fs.writeFileSync(scriptFile, script);
+  return new Promise((resolve, reject) => {
+    const child = require("child_process").spawn(process.execPath, [scriptFile], {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 15000,
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (c) => { stdout += c; });
+    child.stderr.on("data", (c) => { stderr += c; });
+    child.on("close", (code) => {
+      try { fs.unlinkSync(scriptFile); } catch (_) {}
+      if (code === 0 && stdout.trim() === "ok") return resolve();
+      reject(new Error(stderr.trim() || "Zebra print failed"));
+    });
+    child.on("error", (e) => {
+      try { fs.unlinkSync(scriptFile); } catch (_) {}
+      reject(new Error("Zebra print failed: " + e.message));
+    });
+  });
+}
+
+function generateZPLBarcode(barcode, productName, price, copies) {
+  const labels = [];
+  for (let i = 0; i < copies; i++) {
+    labels.push(`^XA
+^FO50,50
+^BY3
+^BCN,100,Y,N,N
+^FD${barcode}
+^FS
+^FO50,180
+^A0N,30,30
+^FD${productName || ""}
+^FS
+${price > 0 ? `^FO50,220\n^A0N,25,25\n^FDRs ${price}\n^FS` : ""}
+^XZ`);
+  }
+  return Buffer.from(labels.join(""), "latin1");
+}
+
+async function printBarcodeLabel(barcode, productName, price, copies) {
+  const data = generateZPLBarcode(barcode, productName, price, copies || 1);
+  await doUSBZPLPrint(data);
 }
 
 function generateHTML(sale, paperSize) {
@@ -1076,4 +1145,33 @@ function printReturnReceipt(returnData, sale, printerConfig) {
   return doPrintJob(html, printerConfig);
 }
 
-module.exports = { printReceipt, printReturnReceipt };
+async function listUSBPrinters() {
+  const devices = await usb.getDevices();
+  const printers = [];
+  for (const d of devices) {
+    try {
+      const cfgs = d.configurations;
+      if (!cfgs || cfgs.length === 0) continue;
+      let isPrinter = false;
+      for (const cfg of cfgs) {
+        for (const iface of cfg.interfaces) {
+          if (iface.alternate && iface.alternate.interfaceClass === 7) {
+            isPrinter = true;
+            break;
+          }
+        }
+        if (isPrinter) break;
+      }
+      if (!isPrinter) continue;
+      printers.push({
+        vendorId: d.vendorId,
+        productId: d.productId,
+        productName: d.productName || "Unknown",
+        serialNumber: d.serialNumber || null,
+      });
+    } catch (_) {}
+  }
+  return printers;
+}
+
+module.exports = { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters };

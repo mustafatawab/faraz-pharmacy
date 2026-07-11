@@ -932,9 +932,6 @@ export default function Products() {
       <PrintBarcodeDialog
         open={!!printBarcode}
         onOpenChange={(v) => { if (!v) setPrintBarcode(null); }}
-        barcode={printBarcode?.barcode ?? ""}
-        productName={printBarcode?.name ?? ""}
-        price={printBarcode?.price}
       />
     </div>
   );

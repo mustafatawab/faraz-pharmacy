@@ -41,6 +41,13 @@ export interface BackupResult {
   error?: string;
 }
 
+export interface USBPrinterInfo {
+  vendorId: number;
+  productId: number;
+  productName: string;
+  serialNumber: string | null;
+}
+
 export interface GDriveConfig {
   clientId: string;
   clientSecret: string;
@@ -58,5 +65,7 @@ declare global {
     appConfig: AppConfig;
     printReceipt: (sale: unknown, printerConfig?: PrinterConfig) => Promise<{ success: boolean; error?: string }>;
     printReturnReceipt: (returnData: unknown, sale: unknown, printerConfig?: PrinterConfig) => Promise<{ success: boolean; error?: string }>;
+    printBarcodeLabel: (barcode: string, productName: string, price: number, copies: number) => Promise<{ success: boolean; error?: string }>;
+    getUSBPrinters: () => Promise<USBPrinterInfo[]>;
   }
 }
