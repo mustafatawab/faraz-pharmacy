@@ -37,13 +37,15 @@
     "framer-motion": "^12.0.0",
     "helmet": "^8.2.0",
     "lucide-react": "^0.400.0",
+    "node-thermal-printer": "^4.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
     "recharts": "^2.0.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.0.0",
-    "tailwindcss-animate": "^1.0.0"
+    "tailwindcss-animate": "^1.0.0",
+    "usb": "^3.0.1"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.6.0",

@@ -1,6 +1,7 @@
 const { BrowserWindow, app } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { usb } = require("usb");
 
 const logoPath = `file://${path.join(__dirname, "image", "logo.png").replace(/\\/g, "/")}`;
 
@@ -803,26 +804,195 @@ function getPrintOptions(printerConfig) {
   return opts;
 }
 
+const SEWOO_VENDOR_ID = 1317;
+const SEWOO_PRODUCT_ID = 42752;
+
+function escposInit() {
+  return Buffer.from([0x1B, 0x40]);
+}
+
+function escposAlign(n) {
+  return Buffer.from([0x1B, 0x61, n]);
+}
+
+function escposBold(n) {
+  return Buffer.from([0x1B, 0x45, n]);
+}
+
+function escposCut(full) {
+  return Buffer.from([0x1D, 0x56, full ? 0x00 : 0x01]);
+}
+
+function escposText(str) {
+  return Buffer.from(str + "\r\n", "latin1");
+}
+
+function escposLine(char, len) {
+  return Buffer.from(char.repeat(len) + "\r\n", "latin1");
+}
+
+function escposFeed(n) {
+  return Buffer.from("\r\n".repeat(n), "latin1");
+}
+
+function generateESCPOSReceipt(sale) {
+  const items = sale.items || [];
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const yy = String(now.getFullYear()).slice(-2);
+  const invNumber = "INV-" + dd + "-" + mm + "-" + yy;
+  const totalAmount = sale.total || 0;
+  const customerArrears = sale.customer_total_arrears || 0;
+  const parts = [];
+
+  parts.push(escposInit());
+  parts.push(escposAlign(1));
+  parts.push(escposBold(1));
+  parts.push(escposText("Faraz Medical Store"));
+  parts.push(escposBold(0));
+  parts.push(escposText("Beside Noman Clinical Laboratory, Barikot"));
+  parts.push(escposLine("=", 32));
+  parts.push(escposAlign(0));
+  parts.push(escposText("Invoice #: " + invNumber));
+  parts.push(escposText("Customer: " + (sale.customer_name || "Walk-in Customer")));
+  parts.push(escposLine("-", 32));
+  parts.push(escposText("Item                    QTY   Amount"));
+  parts.push(escposLine("-", 32));
+
+  items.forEach(item => {
+    const name = (item.product_name || "").padEnd(20).slice(0, 20);
+    const qty = String(item.quantity).padStart(4);
+    const unitPrice = item.subtotal / item.quantity;
+    const displayAmt = String(unitPrice.toFixed(0)) + " x " + item.quantity;
+    const amt = displayAmt.padStart(10);
+    parts.push(escposText(name + " " + qty + "  " + amt));
+  });
+
+  parts.push(escposLine("-", 32));
+
+  if (customerArrears > 0) {
+    parts.push(escposText("Arrears" + " ".repeat(22) + customerArrears.toFixed(0).padStart(8)));
+  }
+
+  if (sale.discount > 0) {
+    parts.push(escposText("Discount" + " ".repeat(20) + "-" + sale.discount.toFixed(0).padStart(7)));
+  }
+
+  parts.push(escposLine("-", 32));
+  parts.push(escposBold(1));
+  parts.push(escposText("Total Amount" + " ".repeat(15) + totalAmount.toFixed(0).padStart(8)));
+  parts.push(escposBold(0));
+  parts.push(escposLine("=", 32));
+
+  if (sale.status === "partial") {
+    parts.push(escposAlign(1));
+    parts.push(escposBold(1));
+    parts.push(escposText("** PARTIAL PAYMENT **"));
+    parts.push(escposBold(0));
+  }
+
+  parts.push(escposAlign(1));
+  parts.push(escposFeed(1));
+  parts.push(escposText("Thank you for your visit"));
+  parts.push(escposText(""));
+  parts.push(escposAlign(0));
+  parts.push(escposText("\u00A9 2026 Mustafa Tawab"));
+  parts.push(escposFeed(3));
+
+  parts.push(escposCut(true));
+
+  return Buffer.concat(parts);
+}
+
+function generateESCPOSReturnReceipt(returnData, sale) {
+  const items = returnData.items || [];
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-PK", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  });
+  const parts = [];
+
+  parts.push(escposInit());
+  parts.push(escposAlign(1));
+  parts.push(escposBold(1));
+  parts.push(escposText("FARAZ PHARMACY"));
+  parts.push(escposBold(0));
+  parts.push(escposText(dateStr));
+  parts.push(escposLine("=", 32));
+  parts.push(escposBold(1));
+  parts.push(escposText("** RETURN RECEIPT **"));
+  parts.push(escposBold(0));
+  parts.push(escposText("Sale: " + (sale?.id?.slice(0, 8) || "N/A")));
+  parts.push(escposLine("-", 32));
+  parts.push(escposAlign(0));
+  parts.push(escposText("Item                     Refund"));
+  parts.push(escposLine("-", 32));
+
+  items.forEach(i => {
+    const reasonStr = i.reason ? " (" + i.reason + ")" : "";
+    const name = (i.product_name + " x" + i.quantity + reasonStr).padEnd(24).slice(0, 24);
+    const amt = String((i.refund_amount ?? i.subtotal ?? 0).toFixed(0)).padStart(8);
+    parts.push(escposText(name + " " + amt));
+  });
+
+  parts.push(escposLine("-", 32));
+  parts.push(escposBold(1));
+  parts.push(escposText("Total Refund" + " ".repeat(14) + returnData.refund_amount.toFixed(0).padStart(8)));
+  parts.push(escposBold(0));
+  parts.push(escposText("Reason: " + returnData.reason));
+  parts.push(escposLine("=", 32));
+  parts.push(escposAlign(1));
+  parts.push(escposText("Return processed successfully"));
+  parts.push(escposFeed(3));
+  parts.push(escposCut(true));
+
+  return Buffer.concat(parts);
+}
+
+async function doUSBPrint(dataBuffer) {
+  const devices = await usb.getDevices();
+  const device = devices.find(d => d.vendorId === SEWOO_VENDOR_ID && d.productId === SEWOO_PRODUCT_ID);
+  if (!device) {
+    throw new Error("Printer not found. Check USB connection.");
+  }
+
+  await device.open();
+  await device.claimInterface(0);
+  const result = await device.transferOut(1, dataBuffer);
+  device.close();
+
+  if (result.status !== "ok") {
+    throw new Error("USB write failed: " + result.status);
+  }
+}
+
 function generateHTML(sale, paperSize) {
   if (paperSize === "a4") return generateA4InvoiceHTML(sale);
   if (paperSize === "a5") return generateA5InvoiceHTML(sale);
   return generateSaleReceiptHTML(sale);
 }
 
-function writeTempHTML(html) {
+function writeTempFile(content, ext) {
   const tmpDir = app.getPath("temp");
-  const filePath = path.join(tmpDir, `faraz-receipt-${Date.now()}.html`);
-  fs.writeFileSync(filePath, html, "utf-8");
+  const filePath = path.join(tmpDir, `faraz-receipt-${Date.now()}.${ext}`);
+  fs.writeFileSync(filePath, content, "utf-8");
   return filePath;
 }
 
-function doPrintJob(html, printerConfig) {
+function doPrintJob(data, printerConfig) {
+  const paperSize = printerConfig?.paperSize || "thermal";
+
+  if (paperSize === "thermal") {
+    return doUSBPrint(data);
+  }
+
   return new Promise((resolve, reject) => {
-    const paperSize = printerConfig?.paperSize || "thermal";
-    const filePath = writeTempHTML(html);
+    const filePath = writeTempFile(data, "html");
 
     const printWin = new BrowserWindow({
-      width: paperSize === "a4" ? 800 : paperSize === "a5" ? 600 : 300,
+      width: paperSize === "a4" ? 800 : 600,
       height: 600,
       show: false,
       webPreferences: { nodeIntegration: false, contextIsolation: true },
@@ -874,12 +1044,20 @@ function doPrintJob(html, printerConfig) {
 
 function printReceipt(sale, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
+  if (paperSize === "thermal") {
+    const data = generateESCPOSReceipt(sale);
+    return doPrintJob(data, printerConfig);
+  }
   const html = generateHTML(sale, paperSize);
   return doPrintJob(html, printerConfig);
 }
 
 function printReturnReceipt(returnData, sale, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
+  if (paperSize === "thermal") {
+    const data = generateESCPOSReturnReceipt(returnData, sale);
+    return doPrintJob(data, printerConfig);
+  }
   const html = generateReturnReceiptHTML(returnData, sale, paperSize);
   return doPrintJob(html, printerConfig);
 }
