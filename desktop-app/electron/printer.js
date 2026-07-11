@@ -804,9 +804,6 @@ function getPrintOptions(printerConfig) {
   return opts;
 }
 
-const SEWOO_VENDOR_ID = 1317;
-const SEWOO_PRODUCT_ID = 42752;
-
 function escposInit() {
   return Buffer.from([0x1B, 0x40]);
 }
@@ -951,11 +948,28 @@ function generateESCPOSReturnReceipt(returnData, sale) {
   return Buffer.concat(parts);
 }
 
-async function doUSBPrint(dataBuffer) {
+async function findUSBPrinter() {
   const devices = await usb.getDevices();
-  const device = devices.find(d => d.vendorId === SEWOO_VENDOR_ID && d.productId === SEWOO_PRODUCT_ID);
+  for (const d of devices) {
+    try {
+      const configs = d.configurations;
+      if (!configs || configs.length === 0) continue;
+      for (const cfg of configs) {
+        for (const iface of cfg.interfaces) {
+          if (iface.alternate && iface.alternate.interfaceClass === 7) {
+            return d;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function doUSBPrint(dataBuffer) {
+  const device = await findUSBPrinter();
   if (!device) {
-    throw new Error("Printer not found. Check USB connection.");
+    throw new Error("No USB printer found. Check connection and power.");
   }
 
   await device.open();
