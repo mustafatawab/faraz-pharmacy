@@ -9,8 +9,9 @@
     "start": "node dist/server.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
+    "db:setup": "npx prisma generate && npx prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "setup": "npm install && npm run db:setup && npm run build",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

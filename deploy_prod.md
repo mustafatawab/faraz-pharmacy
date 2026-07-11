@@ -9,7 +9,7 @@
           ┌──────────────────────────┐
           │ PostgreSQL (port 5433)   │
           │ Express API (port 3001)  │
-          │ Windows Service (NSSM)   │
+          │ PM2 process manager      │
           │ pg_dump backups          │
           │ Electron POS App (opt.)  │
           └───────────┬──────────────┘
@@ -24,7 +24,7 @@
       POS App     POS App     POS App
 ```
 
-- **Server machine** — PostgreSQL + Express API as a Windows Service.
+- **Server machine** — PostgreSQL + Express API managed by **PM2**.
   May also run the Electron POS client for local use.
 - **Client machines** — run only the Electron POS app, connected via LAN.
 
@@ -71,7 +71,8 @@ Verify:
 Extract or clone the server package to a stable location:
 
 ```
-C:\FarazPharmacy\
+C:\FarazPharmacy\          (Windows)
+/opt/faraz-pharmacy/       (macOS/Linux)
 
 ├── server          ← Node.js Express API
 ├── backups         ← pg_dump output
@@ -79,16 +80,16 @@ C:\FarazPharmacy\
 ```
 
 ```bash
-cd C:\FarazPharmacy
+cd /path/to/project
 git clone <repo-url> server
-# or extract the server folder manually
+# or copy the server folder manually
 ```
 
 ---
 
 ## 4. Configure Environment
 
-Create `C:\FarazPharmacy\server\.env`:
+Create `/path/to/server/.env`:
 
 ```env
 DATABASE_URL="postgresql://postgres:yourpassword@localhost:5433/faraz-pharmacy"
@@ -110,7 +111,7 @@ NODE_ENV=production
 ## 5. Install Dependencies & Generate Prisma Client
 
 ```bash
-cd C:\FarazPharmacy\server
+cd /path/to/server
 
 npm install
 
@@ -161,61 +162,76 @@ Password: admin123
 
 ---
 
-## 8. Build the Server
+## 8. Keep the Server Always Running with PM2
+
+**PM2** is a process manager that keeps your server alive forever. If it crashes,
+PM2 restarts it. If the computer reboots, PM2 starts it again automatically.
+
+### 8a. Install PM2
 
 ```bash
-npm run build
+npm install -g pm2
 ```
+
+### 8b. Start the Server with PM2
+
+```bash
+cd /path/to/server
+pm2 start ecosystem.config.cjs
+```
+
+That's it. The server is now running in the background.
+
+Check if it's running:
+
+```bash
+pm2 status
+```
+
+You should see `faraz-api` with status `online`.
+
+Test the API:
+
+```bash
+curl http://localhost:3001/api/health
+```
+
+Expected response:
+```json
+{"status":"ok","timestamp":"2026-07-05T..."}
+```
+
+### 8c. Save the Process List
+
+This tells PM2 to remember which apps to restart:
+
+```bash
+pm2 save
+```
+
+### 8d. Enable Auto-Start on Reboot
+
+**On macOS:**
+
+```bash
+pm2 startup
+```
+
+PM2 will print a command. Copy-paste and run it (it needs `sudo`).
+
+**On Windows:**
+
+Open PowerShell as **Administrator** and run:
+
+```powershell
+pm2 startup
+```
+
+PM2 will print a command. Run that command.
 
 ---
 
-## 9. Install the Express API as a Windows Service
-
-The API must run as a **Windows Service** so it:
-- Starts automatically on boot (before any user logs in)
-- Survives user logout / restart
-- Runs independently of the Electron app
-
-### Install NSSM (Non-Sucking Service Manager)
-
-Download from <https://nssm.cc/download>.
-
-Extract `nssm.exe` to `C:\FarazPharmacy\nssm.exe`.
-
-### Register the Service
-
-Open PowerShell as **Administrator**:
-
-```powershell
-C:\FarazPharmacy\nssm.exe install FarazPharmacyAPI
-```
-
-A GUI window opens. Fill in:
-
-| Field             | Value                                                               |
-| ----------------- | ------------------------------------------------------------------- |
-| **Application**   | `C:\Program Files\nodejs\node.exe`                                  |
-| **Startup directory** | `C:\FarazPharmacy\server\dist`                                  |
-| **Arguments**     | `server.js`                                                         |
-| **Service name**  | `FarazPharmacyAPI`                                                  |
-
-On the **Log on** tab, select **Local System account**.
-
-Click **Install service**.
-
-### Start the Service
-
-```powershell
-net start FarazPharmacyAPI
-```
-
-Or via Services GUI: find `FarazPharmacyAPI` → Start.
-
-Set startup type to **Automatic** in Service properties so it starts on boot.
-
----
-
-## 10. Configure Windows Firewall
+## 9. Configure Windows Firewall (Windows Only)
 
 Allow inbound traffic on port 3001 so client machines can reach the API.
 
@@ -230,29 +246,47 @@ New-NetFirewallRule `
   -Action Allow
 ```
 
-Verify the API is reachable:
-
-```bash
-curl http://localhost:3001/api/health
-```
-
-Expected:
-
-```json
-{"status":"ok","timestamp":"2026-07-05T..."}
-```
-
 ---
 
-## 11. Automatic Database Backups
+## 10. Automatic Database Backups
 
 Create the backup directory:
 
 ```
-C:\FarazPharmacy\backups\
+/path/to/backups/
 ```
 
-### Backup Script
+### macOS / Linux Backup Script
+
+Create `/path/to/backups/backup.sh`:
+
+```bash
+#!/bin/bash
+BACKUP_DIR="/path/to/backups"
+FILENAME="faraz-pharmacy-$(date +%Y%m%d-%H%M).sql"
+pg_dump -U postgres -d faraz-pharmacy > "$BACKUP_DIR/$FILENAME"
+find "$BACKUP_DIR" -name "*.sql" -mtime +30 -delete
+```
+
+Make it executable:
+
+```bash
+chmod +x /path/to/backups/backup.sh
+```
+
+Schedule with cron:
+
+```bash
+crontab -e
+```
+
+Add this line (runs daily at 2 AM):
+
+```
+0 2 * * * /path/to/backups/backup.sh
+```
+
+### Windows Backup Script
 
 Create `C:\FarazPharmacy\backups\backup.bat`:
 
@@ -262,11 +296,12 @@ set BACKUP_DIR=C:\FarazPharmacy\backups
 set FILENAME=faraz-pharmacy-%DATE:~10,4%%DATE:~4,2%%DATE:~7,2%-%TIME:~0,2%%TIME:~3,2%.sql
 set FILENAME=%FILENAME: =0%
 "C:\Program Files\PostgreSQL\16\bin\pg_dump" -U postgres -d faraz-pharmacy > "%BACKUP_DIR%\%FILENAME%"
+forfiles -p "%BACKUP_DIR%" -s -m *.sql -d -30 -c "cmd /c del @path"
 ```
 
 > Adjust the PostgreSQL path if your version differs.
 
-### Schedule with Task Scheduler
+Schedule with Task Scheduler:
 
 1. Open **Task Scheduler**
 2. Create Task → name `FarazPharmacy Backup`
@@ -274,19 +309,9 @@ set FILENAME=%FILENAME: =0%
 4. Action: Start program → browse to `C:\FarazPharmacy\backups\backup.bat`
 5. Run whether user is logged on or not
 
-Optionally add a second trigger for **hourly** for critical data.
-
-### Cleanup Old Backups
-
-Add script logic to delete backups older than 30 days:
-
-```batch
-forfiles -p "%BACKUP_DIR%" -s -m *.sql -d -30 -c "cmd /c del @path"
-```
-
 ---
 
-## 12. Build the Electron Client Installer
+## 11. Build the Electron Client Installer
 
 Run this on any machine with the full repo (development machine):
 
@@ -309,11 +334,11 @@ Copy the installer to a USB drive for distribution.
 
 ---
 
-## 13. Install on the Server Machine (Optional Client)
+## 12. Install on the Server Machine (Optional Client)
 
 If the server machine also runs the POS client:
 
-1. Run `Faraz-Client-Setup.exe`
+1. Run the installer (`Faraz-*.dmg` on macOS or `Faraz-*.exe` on Windows)
 2. **First Launch** screen → click **Server Machine**
 3. The app detects the local IP and shows it to you
 4. Click **Continue to App**
@@ -328,9 +353,9 @@ The Electron app communicates with the local API over localhost.
 
 ---
 
-## 14. Install on Client Machines
+## 13. Install on Client Machines
 
-1. Run `Faraz-Client-Setup.exe`
+1. Run the installer
 2. **First Launch** screen → click **Client Machine**
 3. Enter the server machine's LAN IP (e.g. `192.168.1.100`)
 4. Click **Connect**
@@ -343,7 +368,7 @@ Config saved:
 
 ---
 
-## 15. Runtime URL Resolution
+## 14. Runtime URL Resolution
 
 The `getApiUrl()` function in `desktop-app/src/lib/api.ts` resolves the
 server URL in this order:
@@ -354,19 +379,36 @@ server URL in this order:
 
 ---
 
-## 16. Server Maintenance
+## 15. Server Maintenance
 
-### Restart the API
+### Check Status
 
-```powershell
-net stop FarazPharmacyAPI
-net start FarazPharmacyAPI
+```bash
+pm2 status
 ```
 
 ### View Logs
 
+```bash
+pm2 logs faraz-api
 ```
-C:\FarazPharmacy\logs\
+
+### Restart the API
+
+```bash
+pm2 restart faraz-api
+```
+
+### Stop the API
+
+```bash
+pm2 stop faraz-api
+```
+
+### Monitor CPU / Memory
+
+```bash
+pm2 monit
 ```
 
 ### Check Health
@@ -377,25 +419,25 @@ curl http://localhost:3001/api/health
 
 ---
 
-## 17. Server Update Procedure
+## 16. Server Update Procedure
 
 Before each update:
 
 ```
 1. Backup database (pg_dump)
-2. Stop service: net stop FarazPharmacyAPI
+2. Stop: pm2 stop faraz-api
 3. Update server files (git pull or replace files)
 4. Run: npm install
 5. Run: npx prisma generate
 6. Run: npx prisma migrate deploy   (or npx prisma db push)
 7. Run: npm run build
-8. Start service: net start FarazPharmacyAPI
+8. Start: pm2 start faraz-api
 9. Verify: curl http://localhost:3001/api/health
 ```
 
 ---
 
-## 18. Client Update Procedure
+## 17. Client Update Procedure
 
 ```bash
 cd desktop-app
@@ -404,11 +446,12 @@ npm run build
 ```
 
 Reinstall on each client machine. The config file and cache at
-`%USERPROFILE%\.faraz-pharmacy\` are preserved across reinstalls.
+`~/.faraz-pharmacy/` (macOS/Linux) or `%USERPROFILE%\.faraz-pharmacy\`
+(Windows) are preserved across reinstalls.
 
 ---
 
-## 19. Production Checklist
+## 18. Production Checklist
 
 ### Server Machine
 
@@ -420,9 +463,11 @@ Reinstall on each client machine. The config file and cache at
 - [ ] Migrations applied (`prisma migrate deploy` or `prisma db push`)
 - [ ] Seed data inserted (`npm run db:seed`)
 - [ ] Server built (`npm run build`)
-- [ ] Windows Service registered and started (`FarazPharmacyAPI`)
-- [ ] Service startup type set to **Automatic**
-- [ ] Firewall rule for port 3001 added
+- [ ] PM2 installed (`npm install -g pm2`)
+- [ ] PM2 started (`pm2 start ecosystem.config.cjs`)
+- [ ] PM2 saved (`pm2 save`)
+- [ ] PM2 auto-start configured (`pm2 startup`)
+- [ ] Firewall rule for port 3001 added (Windows only)
 - [ ] Backup script created and scheduled
 - [ ] Health endpoint responds (`curl http://localhost:3001/api/health`)
 - [ ] Electron client installed (optional — if running POS on same machine)
