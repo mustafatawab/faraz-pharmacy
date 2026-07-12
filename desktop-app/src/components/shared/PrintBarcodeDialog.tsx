@@ -12,17 +12,24 @@ import type { USBPrinterInfo } from "@/types/electron";
 interface PrintBarcodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  barcode?: string;
 }
 
-export default function PrintBarcodeDialog({ open, onOpenChange }: PrintBarcodeDialogProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+export default function PrintBarcodeDialog({ open, onOpenChange, barcode: propBarcode }: PrintBarcodeDialogProps) {
   const [barcode, setBarcode] = useState("");
   const [copies, setCopies] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [usbPrinters, setUsbPrinters] = useState<USBPrinterInfo[]>([]);
+  const barcodeId = useRef(0);
 
   useEffect(() => {
     if (!open) return;
+    setBarcode("");
+    setCopies(1);
+    if (propBarcode) {
+      setBarcode(propBarcode);
+      return;
+    }
     (async () => {
       setGenerating(true);
       try {
@@ -38,7 +45,7 @@ export default function PrintBarcodeDialog({ open, onOpenChange }: PrintBarcodeD
       }
       setGenerating(false);
     })();
-  }, [open]);
+  }, [open, propBarcode]);
 
   useEffect(() => {
     if (open) {
@@ -47,25 +54,31 @@ export default function PrintBarcodeDialog({ open, onOpenChange }: PrintBarcodeD
   }, [open]);
 
   useEffect(() => {
-    if (barcode && open && svgRef.current) {
+    if (!barcode || !open) return;
+    barcodeId.current++;
+    const id = barcodeId.current;
+    const svg = document.getElementById("barcode-svg") as unknown as SVGElement;
+    if (!svg) return;
+    requestAnimationFrame(() => {
+      if (id !== barcodeId.current) return;
       try {
-        JsBarcode(svgRef.current, barcode, {
-          format: "CODE128",
-          width: 1.8,
-          height: 50,
+        JsBarcode(svg, barcode, {
+          format: "EAN13",
+          width: 2,
+          height: 60,
           displayValue: true,
           fontSize: 14,
-          margin: 8,
+          margin: 10,
         });
       } catch {
         // invalid barcode
       }
-    }
+    });
   }, [barcode, open]);
 
   async function handlePrint() {
     try {
-      const result = await window.printBarcodeLabel(barcode, "", 0, copies);
+      const result = await window.printBarcodeLabel(barcode, copies);
       if (!result.success) {
         alert("Barcode print failed: " + (result.error || "Unknown error"));
       } else {
@@ -93,7 +106,9 @@ export default function PrintBarcodeDialog({ open, onOpenChange }: PrintBarcodeD
           ) : (
             <>
               <div className="flex flex-col items-center gap-2 p-4 rounded-lg border border-border bg-surface-2">
-                <svg ref={svgRef} />
+                <div className="flex items-center justify-center w-full min-h-[80px]">
+                  <svg id="barcode-svg" />
+                </div>
                 <p className="text-xs text-text-secondary font-mono tracking-wider">{barcode}</p>
               </div>
               <div className="space-y-1">

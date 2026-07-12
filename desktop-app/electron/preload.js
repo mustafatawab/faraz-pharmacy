@@ -24,5 +24,5 @@ contextBridge.exposeInMainWorld("saveConfig", (cfg) => ipcRenderer.invoke("confi
 contextBridge.exposeInMainWorld("getServerIp", () => ipcRenderer.invoke("server:ip"));
 contextBridge.exposeInMainWorld("printReceipt", (sale, printerConfig) => ipcRenderer.invoke("print:receipt", sale, printerConfig));
 contextBridge.exposeInMainWorld("printReturnReceipt", (returnData, sale, printerConfig) => ipcRenderer.invoke("print:return-receipt", returnData, sale, printerConfig));
-contextBridge.exposeInMainWorld("printBarcodeLabel", (barcode, productName, price, copies) => ipcRenderer.invoke("print:barcode-label", barcode, productName, price, copies));
+contextBridge.exposeInMainWorld("printBarcodeLabel", (barcode, copies, labelWidth, labelHeight) => ipcRenderer.invoke("print:barcode-label", barcode, copies, labelWidth, labelHeight));
 contextBridge.exposeInMainWorld("getUSBPrinters", () => ipcRenderer.invoke("usb-printers:list"));

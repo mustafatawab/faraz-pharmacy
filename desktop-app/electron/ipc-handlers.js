@@ -99,9 +99,9 @@ function registerHandlers() {
     }
   });
 
-  ipcMain.handle("print:barcode-label", async (_, barcode, productName, price, copies) => {
+  ipcMain.handle("print:barcode-label", async (_, barcode, copies, labelWidth, labelHeight) => {
     try {
-      await printBarcodeLabel(barcode, productName, price, copies);
+      await printBarcodeLabel(barcode, copies, labelWidth, labelHeight);
       return { success: true };
     } catch (e) {
       return { success: false, error: e.message };

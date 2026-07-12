@@ -88,7 +88,7 @@ export default function Products() {
   const [catDeleteId, setCatDeleteId] = useState<string | null>(null);
   const [catName, setCatName] = useState("");
   const [catSearch, setCatSearch] = useState("");
-  const [printBarcode, setPrintBarcode] = useState<{ barcode: string; name: string; price: number } | null>(null);
+  const [printBarcode, setPrintBarcode] = useState<{ barcode?: string } | null>(null);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products", showArchived],
@@ -584,7 +584,7 @@ export default function Products() {
           <Button variant="primary" size="sm" onClick={() => { setImportOpen(true); setImportRows([]); }}>
             <Upload className="h-3.5 w-3.5 mr-1" /> Import CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setPrintBarcode({ barcode: generateBarcode(), name: "", price: 0 })}>
+          <Button variant="outline" size="sm" onClick={() => setPrintBarcode({})}>
             <Barcode className="h-3.5 w-3.5 mr-1" /> Generate Barcode
           </Button>
         </div>
@@ -932,6 +932,7 @@ export default function Products() {
       <PrintBarcodeDialog
         open={!!printBarcode}
         onOpenChange={(v) => { if (!v) setPrintBarcode(null); }}
+        barcode={printBarcode?.barcode}
       />
     </div>
   );

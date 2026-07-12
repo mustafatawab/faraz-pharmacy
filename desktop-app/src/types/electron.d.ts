@@ -65,7 +65,7 @@ declare global {
     appConfig: AppConfig;
     printReceipt: (sale: unknown, printerConfig?: PrinterConfig) => Promise<{ success: boolean; error?: string }>;
     printReturnReceipt: (returnData: unknown, sale: unknown, printerConfig?: PrinterConfig) => Promise<{ success: boolean; error?: string }>;
-    printBarcodeLabel: (barcode: string, productName: string, price: number, copies: number) => Promise<{ success: boolean; error?: string }>;
+    printBarcodeLabel: (barcode: string, copies: number, labelWidth?: number, labelHeight?: number) => Promise<{ success: boolean; error?: string }>;
     getUSBPrinters: () => Promise<USBPrinterInfo[]>;
   }
 }

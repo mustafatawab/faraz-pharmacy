@@ -41,7 +41,19 @@ export function formatDateTime(dateString?: string | null): string {
 }
 
 export function generateBarcode(): string {
-  return "890" + Math.random().toString().slice(2, 11);
+  const digits = "890" + Math.random().toString().slice(2, 11);
+  return addEAN13CheckDigit(digits);
+}
+
+export function addEAN13CheckDigit(code: string): string {
+  const d = code.replace(/\D/g, "").slice(0, 12);
+  if (d.length < 12) return code;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(d[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return d + check;
 }
 
 export function formatFileSize(bytes: number): string {

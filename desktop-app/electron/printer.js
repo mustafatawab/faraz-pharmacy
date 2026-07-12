@@ -948,16 +948,30 @@ function generateESCPOSReturnReceipt(returnData, sale) {
   return Buffer.concat(parts);
 }
 
-async function findUSBPrinter(interfaceClass) {
+function findUSBEndpoint(iface) {
+  const eps = iface.endpoints;
+  if (eps) {
+    for (const ep of eps) {
+      if (ep.direction === "out" && ep.type === "bulk") {
+        return ep.address;
+      }
+    }
+  }
+  return 1;
+}
+
+async function findUSBPrinter(interfaceClass, excludeVendorId) {
   const devices = await usb.getDevices();
   for (const d of devices) {
     try {
+      if (excludeVendorId && d.vendorId === excludeVendorId) continue;
       const configs = d.configurations;
       if (!configs || configs.length === 0) continue;
       for (const cfg of configs) {
         for (const iface of cfg.interfaces) {
           if (iface.alternate && iface.alternate.interfaceClass === (interfaceClass || 7)) {
-            return d;
+            const endpoint = findUSBEndpoint(iface);
+            if (endpoint) return { device: d, endpoint };
           }
         }
       }
@@ -967,87 +981,91 @@ async function findUSBPrinter(interfaceClass) {
 }
 
 async function doUSBPrint(dataBuffer) {
-  const device = await findUSBPrinter();
-  if (!device) {
+  const result = await findUSBPrinter(7, ZEBRA_VENDOR_ID);
+  if (!result) {
+    console.error("doUSBPrint: No USB printer found (excluding Zebra)");
     throw new Error("No USB printer found. Check connection and power.");
   }
+  const { device, endpoint } = result;
+  console.log(`doUSBPrint: Found device "${device.productName}" endpoint=${endpoint} bufferSize=${dataBuffer.length}`);
 
   await device.open();
+  console.log("doUSBPrint: device opened");
+  try { await device.detachKernelDriver(0); console.log("doUSBPrint: detachKernelDriver OK"); } catch (_) { console.log("doUSBPrint: detachKernelDriver skipped"); }
   await device.claimInterface(0);
-  const result = await device.transferOut(1, dataBuffer);
-  device.close();
-
-  if (result.status !== "ok") {
-    throw new Error("USB write failed: " + result.status);
+  console.log("doUSBPrint: interface claimed");
+  try {
+    const writeResult = await device.transferOut(endpoint, dataBuffer);
+    console.log("doUSBPrint: transferOut status:", writeResult.status);
+    if (writeResult.status !== "ok") {
+      throw new Error("USB write failed: " + writeResult.status);
+    }
+  } finally {
+    try { await device.releaseInterface(0); console.log("doUSBPrint: interface released"); } catch (_) { console.log("doUSBPrint: releaseInterface skipped"); }
+    try { device.close(); console.log("doUSBPrint: device closed"); } catch (_) { console.log("doUSBPrint: close skipped"); }
   }
 }
 
-function generateZebraPrintScript(zpl, usbPath) {
-  return `
-const usb = require(${JSON.stringify(usbPath)}).usb;
-(async () => {
+const ZEBRA_VENDOR_ID = 0x0A5F;
+
+async function findZebraPrinter() {
   const devices = await usb.getDevices();
-  const d = devices.find(x => x.vendorId === 2655 && x.productId === 343);
-  if (!d) { console.error("Zebra not found"); process.exit(1); }
-  await d.open();
-  try { await d.detachKernelDriver(0); } catch (_) {}
-  await d.claimInterface(0);
-  const r = await d.transferOut(1, Buffer.from(${JSON.stringify(zpl)}, "latin1"));
-  d.close();
-  if (r.status !== "ok") { console.error("USB write failed"); process.exit(1); }
-  console.log("ok");
-})().catch(e => { console.error(e.message); process.exit(1); });
-`;
+  for (const d of devices) {
+    try {
+      if (d.vendorId !== ZEBRA_VENDOR_ID) continue;
+      const configs = d.configurations;
+      if (!configs || configs.length === 0) continue;
+      for (const cfg of configs) {
+        for (const iface of cfg.interfaces) {
+          if (iface.alternate && iface.alternate.interfaceClass === 7) {
+            return d;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  return null;
 }
 
 async function doUSBZPLPrint(dataBuffer) {
-  const zpl = dataBuffer.toString("latin1");
-  const usbPath = require.resolve("usb");
-  const script = generateZebraPrintScript(zpl, usbPath);
-  const scriptFile = path.join(app.getPath("temp"), `zebra-print-${Date.now()}.cjs`);
-  fs.writeFileSync(scriptFile, script);
-  return new Promise((resolve, reject) => {
-    const child = require("child_process").spawn(process.execPath, [scriptFile], {
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 15000,
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (c) => { stdout += c; });
-    child.stderr.on("data", (c) => { stderr += c; });
-    child.on("close", (code) => {
-      try { fs.unlinkSync(scriptFile); } catch (_) {}
-      if (code === 0 && stdout.trim() === "ok") return resolve();
-      reject(new Error(stderr.trim() || "Zebra print failed"));
-    });
-    child.on("error", (e) => {
-      try { fs.unlinkSync(scriptFile); } catch (_) {}
-      reject(new Error("Zebra print failed: " + e.message));
-    });
-  });
+  const device = await findZebraPrinter();
+  if (!device) {
+    throw new Error("No Zebra printer found. Check connection and power.");
+  }
+  await device.open();
+  try { await device.detachKernelDriver(0); } catch (_) {}
+  await device.claimInterface(0);
+  try {
+    const result = await device.transferOut(1, dataBuffer);
+    if (result.status !== "ok") {
+      throw new Error("Zebra USB write failed: " + result.status);
+    }
+  } finally {
+    try { await device.releaseInterface(0); } catch (_) {}
+    try { device.close(); } catch (_) {}
+  }
 }
 
-function generateZPLBarcode(barcode, productName, price, copies) {
+function generateZPLBarcode(barcode, copies, labelWidth, labelHeight) {
+  const pw = labelWidth || 203;
+  const ll = labelHeight || 102;
   const labels = [];
   for (let i = 0; i < copies; i++) {
     labels.push(`^XA
-^FO50,50
-^BY3
-^BCN,100,Y,N,N
+^PW${pw}
+^LL${ll}
+^FO5,5
+^BY2
+^BEN,60,Y,N,N
 ^FD${barcode}
 ^FS
-^FO50,180
-^A0N,30,30
-^FD${productName || ""}
-^FS
-${price > 0 ? `^FO50,220\n^A0N,25,25\n^FDRs ${price}\n^FS` : ""}
 ^XZ`);
   }
   return Buffer.from(labels.join(""), "latin1");
 }
 
-async function printBarcodeLabel(barcode, productName, price, copies) {
-  const data = generateZPLBarcode(barcode, productName, price, copies || 1);
+async function printBarcodeLabel(barcode, copies, labelWidth, labelHeight) {
+  const data = generateZPLBarcode(barcode, copies || 1, labelWidth, labelHeight);
   await doUSBZPLPrint(data);
 }
 
@@ -1127,11 +1145,14 @@ function doPrintJob(data, printerConfig) {
 
 function printReceipt(sale, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
+  console.log(`printReceipt: paperSize=${paperSize} items=${(sale.items || []).length} total=${sale.total}`);
   if (paperSize === "thermal") {
     const data = generateESCPOSReceipt(sale);
+    console.log(`printReceipt: generated ESC/POS data length=${data.length}`);
     return doPrintJob(data, printerConfig);
   }
   const html = generateHTML(sale, paperSize);
+  console.log(`printReceipt: generated HTML length=${html.length}`);
   return doPrintJob(html, printerConfig);
 }
 

@@ -28,6 +28,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+import { toast } from "sonner";
 import type { Product, PrinterConfig, ProductPrice } from "@/types";
 
 const PAPER_SIZES = [
@@ -202,6 +203,9 @@ export default function POS() {
       const result = await window.printReceipt(pendingPrintData, config);
       if (!result.success) {
         setError(result.error || "Print failed");
+        toast.error(result.error || "Print failed");
+      } else {
+        toast.success("Receipt printed");
       }
     }
     setPendingPrintData(null);
