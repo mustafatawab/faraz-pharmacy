@@ -2,7 +2,7 @@ import type {
   Product, ProductInput, Customer, CustomerInput, Sale, SaleInput,
   Arrear, ArrearInput, StockPurchase, StockInput, Distributor, DistributorInput,
   Company, CompanyInput, ReturnEntry, ReturnInput, Expense, ExpenseInput,
-  Category, CategoryInput, DashboardStats,
+  Category, CategoryInput, DashboardStats, BarcodeEntry,
 } from "@/types";
 import type { BackupResult, BackupEntry, GDriveConfig } from "@/types/electron";
 
@@ -139,6 +139,11 @@ const api = {
     gdriveGetConfig: (): Promise<GDriveConfig> => fetchJson("GET", "/api/settings/gdrive"),
     gdriveSaveConfig: (cfg: GDriveConfig): Promise<{ success: boolean }> =>
       fetchJson("PUT", "/api/settings/gdrive", cfg),
+  },
+  barcodes: {
+    list: (): Promise<BarcodeEntry[]> => fetchJson("GET", "/api/barcodes"),
+    create: (code: string): Promise<BarcodeEntry> => fetchJson("POST", "/api/barcodes", { code }),
+    delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/barcodes/${id}`),
   },
 };
 

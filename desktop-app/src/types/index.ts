@@ -261,3 +261,11 @@ export interface DashboardStats {
   monthRevenue: { day: string; revenue: number }[];
   topProducts: { name: string; value: number }[];
 }
+
+export interface BarcodeEntry {
+  id: string;
+  code: string;
+  productId: string | null;
+  product: { name: string; active: number } | null;
+  createdAt: string;
+}

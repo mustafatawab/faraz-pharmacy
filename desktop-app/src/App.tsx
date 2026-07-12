@@ -18,6 +18,7 @@ import Distributors from "@/pages/Distributors";
 import Companies from "@/pages/Companies";
 import Returns from "@/pages/Returns";
 import Categories from "@/pages/Categories";
+import Barcodes from "@/pages/Barcodes";
 import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import Invoices from "@/pages/Invoices";
@@ -73,7 +74,7 @@ function AppShell() {
         <main className="flex-1 overflow-y-auto p-5 lg:p-6">
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Navigate to="/pos" replace />} />
               <Route path="/dashboard" element={<AnimatedPage><Dashboard /></AnimatedPage>} />
               <Route path="/pos" element={<AnimatedPage><POS /></AnimatedPage>} />
               <Route path="/products" element={<AnimatedPage><Products /></AnimatedPage>} />
@@ -83,6 +84,7 @@ function AppShell() {
               <Route path="/stock" element={<AnimatedPage><Stock /></AnimatedPage>} />
               <Route path="/distributors" element={<AnimatedPage><Distributors /></AnimatedPage>} />
               <Route path="/companies" element={<AnimatedPage><Companies /></AnimatedPage>} />
+              <Route path="/barcodes" element={<AnimatedPage><Barcodes /></AnimatedPage>} />
               <Route path="/returns" element={<AnimatedPage><Returns /></AnimatedPage>} />
               <Route path="/expenses" element={<AnimatedPage><Expenses /></AnimatedPage>} />
               <Route path="/reports" element={<AnimatedPage><Reports /></AnimatedPage>} />

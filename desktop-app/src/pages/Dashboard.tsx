@@ -9,18 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.06 },
-  },
-} as const;
-
-const itemVariants = {
+const statVariants = {
   hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
-} as const;
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.06, duration: 0.3, ease: "easeOut" },
+  }),
+};
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -30,11 +26,7 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="space-y-5"
-      >
+      <div className="space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-xl" />
@@ -45,56 +37,32 @@ export default function Dashboard() {
           <Skeleton className="h-[300px] rounded-xl" />
         </div>
         <Skeleton className="h-[260px] rounded-xl" />
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-5"
-    >
+    <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <motion.div variants={itemVariants}>
-          <StatCard
-            title="Today's Revenue"
-            value={stats?.todayRevenue ?? 0}
-            icon={<TrendingUp className="h-4 w-4" />}
-            delay={0}
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <StatCard
-            title="Outstanding Arrears"
-            value={stats?.totalArrears ?? 0}
-            icon={<AlertCircle className="h-4 w-4" />}
-            delay={0.05}
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <StatCard
-            title="Low Stock Items"
-            value={stats?.lowStockCount ?? 0}
-            icon={<Package className="h-4 w-4" />}
-            delay={0.1}
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <StatCard
-            title="Expiring Soon"
-            value={stats?.expiringSoonCount ?? 0}
-            icon={<Clock className="h-4 w-4" />}
-            delay={0.15}
-          />
-        </motion.div>
+        {([
+          { title: "Today's Revenue", value: stats?.todayRevenue ?? 0, icon: TrendingUp },
+          { title: "Outstanding Arrears", value: stats?.totalArrears ?? 0, icon: AlertCircle },
+          { title: "Low Stock Items", value: stats?.lowStockCount ?? 0, icon: Package },
+          { title: "Expiring Soon", value: stats?.expiringSoonCount ?? 0, icon: Clock },
+        ] as const).map((item, i) => (
+          <motion.div
+            key={item.title}
+            custom={i}
+            variants={statVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <StatCard title={item.title} value={item.value} icon={<item.icon className="h-4 w-4" />} delay={0} />
+          </motion.div>
+        ))}
       </div>
 
-      <motion.div
-        variants={itemVariants}
-        className="grid grid-cols-1 lg:grid-cols-3 gap-5"
-      >
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Revenue Trend</CardTitle>
@@ -113,19 +81,17 @@ export default function Dashboard() {
             <DonutChart data={stats?.topProducts} />
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Sales</CardTitle>
-            <CardDescription>Latest transactions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RecentSalesTable />
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Sales</CardTitle>
+          <CardDescription>Latest transactions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RecentSalesTable />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -851,6 +851,11 @@ function generateESCPOSReceipt(sale) {
   parts.push(escposText("Beside Noman Clinical Laboratory, Barikot"));
   parts.push(escposLine("=", 32));
   parts.push(escposAlign(0));
+  const dateStr = now.toLocaleDateString("en-PK", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+  parts.push(escposText("Date: " + dateStr));
   parts.push(escposText("Invoice #: " + invNumber));
   parts.push(escposText("Customer: " + (sale.customer_name || "Walk-in Customer")));
   parts.push(escposLine("-", 32));

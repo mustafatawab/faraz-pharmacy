@@ -84,6 +84,7 @@ export const salesService = {
       orderBy: { createdAt: "desc" },
       include: {
         customer: { select: { name: true } },
+        _count: { select: { items: true, returns: true } },
       },
     });
   },
@@ -97,6 +98,7 @@ export const salesService = {
       orderBy: { createdAt: "desc" },
       include: {
         customer: { select: { name: true } },
+        _count: { select: { items: true, returns: true } },
       },
     });
   },

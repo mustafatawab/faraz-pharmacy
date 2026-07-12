@@ -67,6 +67,12 @@ export const medicinesService = {
         expiry: data.expiry ?? null,
         packSize: data.packSize ?? 1,
         prices: { createMany: { data: pricesData } },
+        barcodeLink: {
+          connectOrCreate: {
+            where: { code: data.barcode },
+            create: { code: data.barcode },
+          },
+        },
       },
       include: { prices: true },
     });
@@ -107,6 +113,13 @@ export const medicinesService = {
       await prisma.productPrice.deleteMany({ where: { productId: id } });
       updateData.prices = { createMany: { data: pricesData } };
     }
+
+    updateData.barcodeLink = {
+      connectOrCreate: {
+        where: { code: data.barcode },
+        create: { code: data.barcode },
+      },
+    };
 
     return prisma.product.update({
       where: { id },

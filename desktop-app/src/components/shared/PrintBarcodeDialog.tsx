@@ -19,6 +19,7 @@ export default function PrintBarcodeDialog({ open, onOpenChange, barcode: propBa
   const [barcode, setBarcode] = useState("");
   const [copies, setCopies] = useState(1);
   const [generating, setGenerating] = useState(false);
+  const [isNewBarcode, setIsNewBarcode] = useState(false);
   const [usbPrinters, setUsbPrinters] = useState<USBPrinterInfo[]>([]);
   const barcodeId = useRef(0);
 
@@ -26,25 +27,40 @@ export default function PrintBarcodeDialog({ open, onOpenChange, barcode: propBa
     if (!open) return;
     setBarcode("");
     setCopies(1);
+    setIsNewBarcode(false);
     if (propBarcode) {
       setBarcode(propBarcode);
       return;
     }
+    let cancelled = false;
     (async () => {
       setGenerating(true);
       try {
-        const products = await api.products.list();
-        const existing = new Set(products.map(p => p.barcode));
+        const [products, existingBarcodes] = await Promise.all([
+          api.products.list(),
+          api.barcodes.list(),
+        ]);
+        const existing = new Set([
+          ...products.map(p => p.barcode),
+          ...existingBarcodes.map(b => b.code),
+        ]);
         let code = generateBarcode();
         while (existing.has(code)) {
           code = generateBarcode();
         }
-        setBarcode(code);
+        if (!cancelled) {
+          setBarcode(code);
+          setIsNewBarcode(true);
+        }
       } catch {
-        setBarcode(generateBarcode());
+        if (!cancelled) {
+          setBarcode(generateBarcode());
+          setIsNewBarcode(true);
+        }
       }
-      setGenerating(false);
+      if (!cancelled) setGenerating(false);
     })();
+    return () => { cancelled = true; };
   }, [open, propBarcode]);
 
   useEffect(() => {
@@ -78,6 +94,9 @@ export default function PrintBarcodeDialog({ open, onOpenChange, barcode: propBa
 
   async function handlePrint() {
     try {
+      if (isNewBarcode) {
+        await api.barcodes.create(barcode);
+      }
       const result = await window.printBarcodeLabel(barcode, copies);
       if (!result.success) {
         alert("Barcode print failed: " + (result.error || "Unknown error"));

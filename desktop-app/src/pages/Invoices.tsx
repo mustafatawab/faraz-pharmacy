@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, Calendar, Download, FileText } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
+import InvoiceDetailDialog from "@/components/shared/InvoiceDetailDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
@@ -15,6 +16,7 @@ export default function Invoices() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
 
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["invoices", search, dateFrom, dateTo],
@@ -25,7 +27,7 @@ export default function Invoices() {
     const headers = ["Sale ID", "Date", "Customer", "Items", "Subtotal", "Discount", "Total", "Paid", "Change", "Status"];
     return sales.map((s: Sale) => [
       s.id, s.created_at, s.customer_name || "Walk-in",
-      s.items?.length ?? 0, s.subtotal, s.discount, s.total, s.amount_paid, s.change, s.status,
+      s.item_count ?? 0, s.subtotal, s.discount, s.total, s.amount_paid, s.change, s.status,
     ]);
   }, [sales]);
 
@@ -41,9 +43,9 @@ export default function Invoices() {
 
   const columns = [
     { key: "created_at", header: "Date", cell: (s: Sale) => <span className="font-mono text-xs text-text-secondary">{formatDateTime(s.created_at)}</span> },
-    { key: "id", header: "Invoice ID", cell: (s: Sale) => <span className="font-mono text-xs text-text-secondary">{s.id.slice(0, 8)}</span> },
+    { key: "id", header: "Invoice ID", cell: (s: Sale) => <span className="font-mono text-xs text-text-secondary">{s.id}</span> },
     { key: "customer_name", header: "Customer", cell: (s: Sale) => <span>{s.customer_name || "Walk-in"}</span> },
-    { key: "item_count", header: "Items", cell: (s: Sale) => <span className="font-mono text-sm">{s.items?.length ?? 0}</span> },
+    { key: "item_count", header: "Items", cell: (s: Sale) => <span className="font-mono text-sm">{(s as any).item_count ?? s.items?.length ?? 0}</span> },
     { key: "total", header: "Total", cell: (s: Sale) => <span className="font-mono font-medium">{formatCurrency(s.total)}</span> },
     { key: "amount_paid", header: "Paid", cell: (s: Sale) => <span className="font-mono">{formatCurrency(s.amount_paid)}</span> },
     { key: "status", header: "Status", cell: (s: Sale) => <StatusBadge status={s.status} /> },
@@ -73,8 +75,20 @@ export default function Invoices() {
         </Button>
       </div>
       <div className="rounded-xl border border-border">
-        <DataTable columns={columns} data={sales} loading={isLoading} keyExtractor={(s: Sale) => s.id} />
+        <DataTable
+          columns={columns}
+          data={sales}
+          loading={isLoading}
+          keyExtractor={(s: Sale) => s.id}
+          onRowClick={(s: Sale) => setSelectedSaleId(s.id)}
+        />
       </div>
+
+      <InvoiceDetailDialog
+        open={!!selectedSaleId}
+        onOpenChange={(v) => { if (!v) setSelectedSaleId(null); }}
+        saleId={selectedSaleId}
+      />
     </div>
   );
 }

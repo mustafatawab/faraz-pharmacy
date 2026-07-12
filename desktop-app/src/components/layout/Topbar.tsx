@@ -7,6 +7,7 @@ const pageLabels: Record<string, { title: string; subtitle: string }> = {
   "/dashboard": { title: "Dashboard", subtitle: "Business overview" },
   "/pos": { title: "Point of Sale", subtitle: "Create and manage sales" },
   "/products": { title: "Products", subtitle: "Inventory management" },
+  "/barcodes": { title: "Barcodes", subtitle: "Custom barcode labels" },
   "/stock": { title: "Stock", subtitle: "Purchase management" },
   "/customers": { title: "Customers", subtitle: "Customer records" },
   "/invoices": { title: "Invoices", subtitle: "Sales invoices" },
