@@ -1,7 +1,7 @@
-module.exports = {
+export default {
   apps: [{
     name: "faraz-pharmacy-api",
-    script: "dist/index.js",
+    script: "dist/server.js",
     instances: 1,
     exec_mode: "fork",
     env: {

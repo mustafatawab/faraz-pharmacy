@@ -17,7 +17,7 @@ export const companiesService = {
         phone: data.phone ?? "",
         contact: data.contact ?? "",
         address: data.address ?? "",
-        secondNumber: data.secondNumber ?? "",
+        secondNumber: data.second_number ?? "",
       },
     });
   },
@@ -32,7 +32,7 @@ export const companiesService = {
         phone: data.phone ?? "",
         contact: data.contact ?? "",
         address: data.address ?? "",
-        secondNumber: data.secondNumber ?? "",
+        secondNumber: data.second_number ?? "",
       },
     });
   },
