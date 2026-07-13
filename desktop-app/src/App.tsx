@@ -3,8 +3,10 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ServerConnectionProvider } from "@/contexts/ServerConnectionContext";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
+import OfflineBanner from "@/components/shared/OfflineBanner";
 import FirstLaunch from "@/components/setup/FirstLaunch";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -71,6 +73,7 @@ function AppShell() {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
+        <OfflineBanner />
         <main className="flex-1 overflow-y-auto p-5 lg:p-6">
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
@@ -100,9 +103,11 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppShell />
-      <Toaster richColors position="top-right" closeButton />
-    </AuthProvider>
+    <ServerConnectionProvider>
+      <AuthProvider>
+        <AppShell />
+        <Toaster richColors position="top-right" closeButton />
+      </AuthProvider>
+    </ServerConnectionProvider>
   );
 }

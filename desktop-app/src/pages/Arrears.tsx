@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Plus, Trash2, CheckCircle, Lock } from "lucide-react";
+import { CreditCard, Plus, Trash2, CheckCircle, Lock, Printer } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import StatCard from "@/components/shared/StatCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import DataTable from "@/components/shared/DataTable";
+import InvoiceDetailDialog from "@/components/shared/InvoiceDetailDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,15 +16,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { Arrear, Customer } from "@/types";
-
-async function verifyAdminPassword(password: string): Promise<boolean> {
-  try {
-    const res = await api.auth.verifyPassword(password);
-    return res.valid;
-  } catch {
-    return false;
-  }
-}
 
 export default function Arrears() {
   const queryClient = useQueryClient();
@@ -35,6 +27,8 @@ export default function Arrears() {
   const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; action: "pay" | "settle" | "delete"; targetId: string; payAmount?: number }>({ open: false, action: "pay", targetId: "" });
   const [adminPassword, setAdminPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [printDialog, setPrintDialog] = useState<{ open: boolean; saleId: string | null }>({ open: false, saleId: null });
+  const [viewSaleId, setViewSaleId] = useState<string | null>(null);
 
   const { data: arrears = [], isLoading } = useQuery({
     queryKey: ["arrears", filter],
@@ -44,13 +38,17 @@ export default function Arrears() {
   const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: api.customers.list });
 
   const recordPayment = useMutation({
-    mutationFn: ({ id, amount }: { id: string; amount: number }) => api.arrears.recordPayment(id, amount),
-    onSuccess: () => {
+    mutationFn: ({ id, amount, password }: { id: string; amount: number; password: string }) =>
+      api.arrears.recordPayment(id, amount, password),
+    onSuccess: (data) => {
       toast.success("Payment recorded");
       queryClient.invalidateQueries({ queryKey: ["arrears"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       setPayingId(null);
       setPaymentAmount("");
+      setPrintDialog({ open: true, saleId: data.paymentSaleId });
     },
     onError: (err: Error) => {
       toast.error(err.message);
@@ -89,12 +87,15 @@ export default function Arrears() {
   });
 
   const settleMutation = useMutation({
-    mutationFn: (id: string) => api.arrears.settle(id),
-    onSuccess: () => {
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      api.arrears.settle(id, password),
+    onSuccess: (data) => {
       toast.success("Arrear settled");
       queryClient.invalidateQueries({ queryKey: ["arrears"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setPrintDialog({ open: true, saleId: data.paymentSaleId });
     },
     onError: (err: Error) => {
       toast.error(err.message);
@@ -103,16 +104,12 @@ export default function Arrears() {
 
   async function handleAdminAction(action: "pay" | "settle" | "delete") {
     setPasswordError("");
-    const ok = await verifyAdminPassword(adminPassword);
-    if (!ok) {
-      setPasswordError("Incorrect admin password");
-      return;
-    }
     const { targetId, payAmount } = passwordDialog;
+
     if (action === "pay" && payAmount) {
-      recordPayment.mutate({ id: targetId, amount: payAmount });
+      recordPayment.mutate({ id: targetId, amount: payAmount, password: adminPassword });
     } else if (action === "settle") {
-      settleMutation.mutate(targetId);
+      settleMutation.mutate({ id: targetId, password: adminPassword });
     } else if (action === "delete") {
       deleteMutation.mutate(targetId);
     }
@@ -206,6 +203,7 @@ export default function Arrears() {
           </div>
         </DialogContent>
       </Dialog>
+
       <Dialog open={passwordDialog.open} onOpenChange={(o) => setPasswordDialog({ ...passwordDialog, open: o })}>
         <DialogContent>
           <DialogHeader>
@@ -233,6 +231,33 @@ export default function Arrears() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={printDialog.open} onOpenChange={(o) => { if (!o) setPrintDialog({ open: false, saleId: null }); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="h-4 w-4" />
+              Print Receipt?
+            </DialogTitle>
+            <DialogDescription>Do you want to print the receipt for this payment?</DialogDescription>
+          </DialogHeader>
+          <div className="px-5 pb-5 flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setPrintDialog({ open: false, saleId: null })}>No</Button>
+            <Button onClick={() => {
+              setViewSaleId(printDialog.saleId);
+              setPrintDialog({ open: false, saleId: null });
+            }}>
+              Yes, Print
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <InvoiceDetailDialog
+        open={!!viewSaleId}
+        onOpenChange={(v) => { if (!v) setViewSaleId(null); }}
+        saleId={viewSaleId}
+      />
     </div>
   );
 }

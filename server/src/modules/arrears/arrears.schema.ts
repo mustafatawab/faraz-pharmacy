@@ -9,6 +9,11 @@ export const createArrearSchema = z.object({
 
 export const payArrearSchema = z.object({
   amount: z.number().positive(),
+  password: z.string().min(1),
+});
+
+export const settleArrearSchema = z.object({
+  password: z.string().min(1),
 });
 
 export type CreateArrearInput = z.infer<typeof createArrearSchema>;

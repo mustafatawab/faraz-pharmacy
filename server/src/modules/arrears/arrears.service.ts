@@ -1,6 +1,22 @@
 import { prisma } from "../../services/prisma";
-import { NotFoundError } from "../../utils/errors";
+import { NotFoundError, UnauthorizedError } from "../../utils/errors";
 import { Prisma } from "../../generated/prisma/client";
+import { authService } from "../auth/auth.service";
+
+function generateSaleId(prefix: string, lastId: string | null) {
+  let nextNum = 1;
+  if (lastId) {
+    nextNum = parseInt(lastId.slice(-6), 10) + 1;
+  }
+  return `${prefix}${nextNum.toString().padStart(6, "0")}`;
+}
+
+function makeSalePrefix(): string {
+  const now = new Date();
+  const yy = now.getFullYear().toString().slice(-2);
+  const mm = (now.getMonth() + 1).toString().padStart(2, "0");
+  return `${yy}${mm}-`;
+}
 
 export const arrearsService = {
   async list(status?: string) {
@@ -16,7 +32,7 @@ export const arrearsService = {
     const balanceDue = data.totalBill - (data.amountPaid ?? 0);
     return prisma.arrear.create({
       data: {
-        saleId: data.saleId ?? "",
+        saleId: data.saleId ?? null,
         customerId: data.customerId,
         totalBill: data.totalBill,
         amountPaid: data.amountPaid ?? 0,
@@ -27,8 +43,14 @@ export const arrearsService = {
     });
   },
 
-  async recordPayment(id: string, amount: number) {
-    const arrear = await prisma.arrear.findUnique({ where: { id } });
+  async recordPayment(id: string, amount: number, password: string) {
+    const { valid } = await authService.verifyPassword(password);
+    if (!valid) throw new UnauthorizedError("Invalid admin password");
+
+    const arrear = await prisma.arrear.findUnique({
+      where: { id },
+      include: { customer: { select: { name: true } } },
+    });
     if (!arrear) throw new NotFoundError("Arrear");
 
     const newPaid = arrear.amountPaid + amount;
@@ -42,17 +64,45 @@ export const arrearsService = {
         include: { customer: { select: { name: true } } },
       });
 
-      if (newBalance <= 0 && arrear.saleId) {
+      if (arrear.saleId) {
         await tx.sale.update({ where: { id: arrear.saleId }, data: { status: "paid" } });
       }
 
-      return updated;
+      const prefix = makeSalePrefix();
+      const last = await tx.sale.findFirst({
+        where: { id: { startsWith: prefix } },
+        orderBy: { id: "desc" },
+      });
+      const saleId = generateSaleId(prefix, last?.id ?? null);
+
+      const paymentSale = await tx.sale.create({
+        data: {
+          id: saleId,
+          customerId: arrear.customerId,
+          subtotal: amount,
+          discount: 0,
+          total: amount,
+          amountPaid: amount,
+          change: 0,
+          status: "paid",
+        },
+      });
+
+      return { arrear: updated, paymentSaleId: paymentSale.id };
     });
   },
 
-  async settle(id: string) {
-    const arrear = await prisma.arrear.findUnique({ where: { id } });
+  async settle(id: string, password: string) {
+    const { valid } = await authService.verifyPassword(password);
+    if (!valid) throw new UnauthorizedError("Invalid admin password");
+
+    const arrear = await prisma.arrear.findUnique({
+      where: { id },
+      include: { customer: { select: { name: true } } },
+    });
     if (!arrear) throw new NotFoundError("Arrear");
+
+    const settleAmount = arrear.balanceDue;
 
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updated = await tx.arrear.update({
@@ -65,7 +115,27 @@ export const arrearsService = {
         await tx.sale.update({ where: { id: arrear.saleId }, data: { status: "paid" } });
       }
 
-      return updated;
+      const prefix = makeSalePrefix();
+      const last = await tx.sale.findFirst({
+        where: { id: { startsWith: prefix } },
+        orderBy: { id: "desc" },
+      });
+      const saleId = generateSaleId(prefix, last?.id ?? null);
+
+      const paymentSale = await tx.sale.create({
+        data: {
+          id: saleId,
+          customerId: arrear.customerId,
+          subtotal: settleAmount,
+          discount: 0,
+          total: settleAmount,
+          amountPaid: settleAmount,
+          change: 0,
+          status: "paid",
+        },
+      });
+
+      return { arrear: updated, paymentSaleId: paymentSale.id };
     });
   },
 

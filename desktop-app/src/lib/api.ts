@@ -87,9 +87,11 @@ const api = {
   arrears: {
     list: (status?: string): Promise<Arrear[]> => fetchJson("GET", `/api/arrears${status ? `?status=${status}` : ""}`),
     create: (a: ArrearInput): Promise<Arrear> => fetchJson("POST", "/api/arrears", a),
-    recordPayment: (id: string, amount: number): Promise<Arrear> => fetchJson("POST", `/api/arrears/${id}/pay`, { amount }),
+    recordPayment: (id: string, amount: number, password: string): Promise<{ arrear: Arrear; paymentSaleId: string }> =>
+      fetchJson("POST", `/api/arrears/${id}/pay`, { amount, password }),
     delete: (id: string): Promise<{ success: boolean }> => fetchJson("DELETE", `/api/arrears/${id}`),
-    settle: (id: string): Promise<Arrear> => fetchJson("POST", `/api/arrears/${id}/settle`),
+    settle: (id: string, password: string): Promise<{ arrear: Arrear; paymentSaleId: string }> =>
+      fetchJson("POST", `/api/arrears/${id}/settle`, { password }),
   },
   stock: {
     list: (): Promise<StockPurchase[]> => fetchJson("GET", "/api/stock"),

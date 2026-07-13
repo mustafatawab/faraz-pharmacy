@@ -15,8 +15,6 @@ yarn-error.log*
 .pnpm-debug.log*
 coverage/
 .vercel
-server/src/generated/
-server/generated/
 .agents/
 skills-lock.json
 SKILL.md

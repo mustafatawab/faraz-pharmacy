@@ -481,3 +481,22 @@ Reinstall on each client machine. The config file and cache at
 - [ ] Products list loads
 - [ ] Sales workflow tested (add item, checkout, print)
 - [ ] Receipt printing tested
+
+
+
+----
+----
+
+
+A static IP means the server machine always gets the same IP address (e.g., 192.168.1.100) instead of a different one each time it boots.
+By default, most networks use DHCP — your router automatically assigns an IP, and it can change after a restart or when the lease expires. If that happens, all your client machines will try to connect to the old IP and fail.
+Two ways to fix it:
+1. Router setting (recommended) — In your router admin panel, find "DHCP Reservation" or "Static Lease." Assign a fixed IP to the server machine's MAC address. The server still uses DHCP, but the router always gives it the same IP.
+2. On the machine itself — Manually set the IP in network settings. Less flexible — if you move the machine to a different network, it won't work until you change it back.
+
+
+**On Windows:**
+> Settings > Network & Internet > Ethernet > IP assignment → Edit → Manual
+
+**On macOS:**
+> System Settings > Network > (your connection) > Details > TCP/IP → Configure IPv4 → Manually

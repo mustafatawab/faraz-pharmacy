@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Server, Monitor, Sun, Moon, Search, Bell } from "lucide-react";
+import { useServerConnection } from "@/contexts/ServerConnectionContext";
 
 const pageLabels: Record<string, { title: string; subtitle: string }> = {
   "/dashboard": { title: "Dashboard", subtitle: "Business overview" },
@@ -47,6 +48,7 @@ export default function Topbar() {
     try { localStorage.setItem("faraz_theme", next ? "dark" : "light"); } catch {}
   }
 
+  const { isOnline, isInitialCheck } = useServerConnection();
   const page = pageLabels[location.pathname] || { title: "Dashboard", subtitle: "Business overview" };
   const isServer = window.appConfig?.mode === "server";
 
@@ -65,6 +67,15 @@ export default function Topbar() {
 
         <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-1 px-1.5 h-5 rounded bg-muted text-[9px] text-text-secondary font-medium">
+            <span
+              className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                isInitialCheck
+                  ? "bg-muted-foreground/40"
+                  : isOnline
+                    ? "bg-success"
+                    : "bg-danger"
+              }`}
+            />
             {isServer ? (
               <Server className="h-2.5 w-2.5 text-accent" />
             ) : (
