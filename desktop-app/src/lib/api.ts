@@ -113,6 +113,7 @@ const api = {
   },
   returns: {
     list: (): Promise<ReturnEntry[]> => fetchJson("GET", "/api/returns"),
+    getById: (id: string): Promise<ReturnEntry> => fetchJson("GET", `/api/returns/${id}`),
     create: (r: ReturnInput): Promise<ReturnEntry> => fetchJson("POST", "/api/returns", r),
   },
   expenses: {

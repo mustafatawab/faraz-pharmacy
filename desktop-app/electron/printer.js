@@ -10,171 +10,141 @@ const logoPath = `file://${path.join(__dirname, "image", "logo.png").replace(/\\
 function generateSaleReceiptHTML(sale) {
 
   const items = sale.items || [];
-
   const now = new Date();
-
   const dateStr = now.toLocaleDateString("en-PK", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit"
   });
-
   const totalAmount = sale.total || 0;
   const paid = sale.amount_paid || 0;
   const balance = Math.max(0, totalAmount - paid);
-  const customerArrears = sale.customer_total_arrears || 0;
+  const changeDue = sale.change || 0;
+  const discount = sale.discount || 0;
+
+  const itemsHTML = items.map(item => {
+    const unitPrice = item.unit_price || (item.subtotal / item.quantity);
+    return `
+      <tr>
+        <td>${item.product_name}</td>
+        <td class="r">${item.quantity}</td>
+        <td class="r">${Math.round(unitPrice)}</td>
+        <td class="r b">${Math.round(item.subtotal)}</td>
+      </tr>`;
+  }).join("");
 
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-
 <style>
 @page { size: 80mm auto; margin: 0; }
-
 body {
   width: 80mm;
-            font-family: 'Arial', sans-serif;
-            font-size: 13px;
-            margin: 0;
-            padding: 5mm;
-            color: #000;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, "Lucida Console", monospace;;
+  font-size: 16px;
+  margin: 0;
+  padding: 5mm;
+  color: #000;
 }
-
 .center { text-align: center; }
-.header { font-weight: bold; font-size: 18px; }
-.small { font-size: 14px; }
-
-.divider { border-top: 1px dashed #000; margin: 8px 0; }
-
+.b { font-weight: 700; }
+.header { font-weight: bold; font-size: 16px;}
+.sub { font-size: 12px; color: #333; margin: 2px 0; }
+.divider { border-top: 1px dashed #888; margin: 6px 0; }
+.thick { border-top: 2px solid #000; margin: 6px 0; }
 table { width: 100%; border-collapse: collapse; }
-
 th {
   border-bottom: 1px solid #000;
   text-align: left;
-  font-size: 14px;
+  font-size: 11px;
+  padding: 4px 0;
+  letter-spacing: 1px;
 }
+td { padding: 2px 0; font-size: 12px; }
+.r { text-align: right; }
+.lines td { padding: 3px 0; }
 
-td { padding: 2px 0;
- font-size: 14px; }
-
-.text-right { text-align: right; }
-
-.total-box {
-  border-top: 2px solid #000;
-  border-bottom: 2px solid #000;
-  font-weight: bold;
-  font-size: 14px;
-}
-
-.urdu {
-  direction: rtl;
-  font-family: Arial, sans-serif;
-  font-size: 13px;
+.urdu{
+ display: flex;
+ flex-direction: columns;
+ align-items: center;
+ justify-content: center;
 }
 </style>
-
 </head>
-
 <body>
 
 <div class="center">
-  <div class="header">FARAZ PHARMACY</div>
-  <div class="small">Beside Noman Clinical Laboratory, Barikot</div>
-  <div class="small">Phone: 03469383792 / 03449006940</div>
+  <div class="header">FARAZ MEDICAL STORE</div>
+  <div class="sub">Beside Noman Clinical Laboratory, Barikot</div>
+  <div class="sub">Phone: 03469383792 / 03449006940</div>
 </div>
 
 <div class="divider"></div>
 
-<div>Invoice #: ${sale.id || Math.floor(Math.random() * 100000)}</div>
-<div>Date: ${dateStr}</div>
-<div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
-<div>No. of items: ${items.length}</div>
+<div style="font-size:11px;">
+  <div>Date: ${dateStr}</div>
+  <div>Invoice #: ${sale.id || ""}</div>
+  <div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
+</div>
 
 <div class="divider"></div>
+
+<div style="font-size:11px; margin-bottom:4px;">No. of Items: ${items.length}</div>
 
 <table>
   <thead>
     <tr>
       <th>Product</th>
-      <th>Qty</th>
-      <th class="text-right">Amount</th>
+      <th class="r">Qty</th>
+      <th class="r">Price</th>
+      <th class="r">Amount</th>
     </tr>
   </thead>
-
-  <tbody>
-    ${items.map(item => `
-      <tr>
-        <td>${item.product_name}</td>
-        <td>${item.quantity}</td>
-        <td class="text-right">${item.subtotal.toFixed(0)}</td>
-      </tr>
-    `).join("")}
-  </tbody>
+  <tbody>${itemsHTML}</tbody>
 </table>
 
 <div class="divider"></div>
 
-<table>
-  <tr>
-    <td>Subtotal</td>
-    <td class="text-right">${sale.subtotal.toFixed(0)}</td>
-  </tr>
+<table class="lines">
+  <tr><td style="width:70%">Total Amount</td><td class="r">${Math.round(totalAmount)}</td></tr>
+  ${discount > 0 ? `<tr><td>Discount</td><td class="r">-${Math.round(discount)}</td></tr>` : ""}
+  <tr><td>GST (0%)</td><td class="r">0</td></tr>
+</table>
 
-  ${sale.discount > 0 ? `
-  <tr>
-    <td>Discount</td>
-    <td class="text-right">-${sale.discount.toFixed(0)}</td>
-  </tr>` : ""}
+<div class="thick"></div>
 
-  <tr class="total-box">
-    <td>TOTAL</td>
-    <td class="text-right">${totalAmount.toFixed(0)}</td>
-  </tr>
-
-  <tr>
-    <td>Paid</td>
-    <td class="text-right">${paid.toFixed(0)}</td>
-  </tr>
-
-  <tr>
-    <td>Balance</td>
-    <td class="text-right">${balance.toFixed(0)}</td>
-  </tr>
-
-  <tr>
-    <td>Arrears</td>
-    <td class="text-right">${customerArrears.toFixed(0)}</td>
-  </tr>
+<table class="lines">
+  <tr><td style="width:70%" class="b">Total Payable</td><td class="r b">${Math.round(totalAmount)}</td></tr>
+  <tr><td>Amount Paid</td><td class="r">${Math.round(paid)}</td></tr>
+  ${balance > 0
+    ? `<tr><td>Balance</td><td class="r">${Math.round(balance)}</td></tr>`
+    : changeDue > 0
+      ? `<tr><td>Change</td><td class="r">${Math.round(changeDue)}</td></tr>`
+      : ""}
 </table>
 
 <div class="divider"></div>
 
-<table>
-  <tr>
-    <td class="urdu">
-      <b>ضروری نوٹ</b><br>
-      - رسید کے بغیر کوئی واپسی نہیں<br>
-      - دوائیوں کی واپسی ممکن نہیں<br>
-      - 3 دن بعد کوئی واپسی نہیں
-    </td>
-  </tr>
-</table>
+<div style="text-align:center;">
+  <div class="urdu">
+   <span>
+    No return without receipt
+    </span>
+    <span>
+    No return of freezer/refrigerator medicines
+    </span>
 
-<div class="divider"></div>
-
-<div class="center">
-  <b>
-  Developed By farsightsystem.com
-  </b>
+    <span>
+    No return after 3 days
+    </span>
+  </div>
 </div>
 
 <div class="divider"></div>
 
-<div class="center small">
-  THANK YOU FOR YOUR VISIT<br>
+<div class="center" style="font-size:10px; color:#555;">
+  THANK YOU FOR YOUR VISIT
 </div>
 
 </body>
@@ -192,7 +162,7 @@ function generateA4InvoiceHTML(sale) {
 <style>
 @page { margin: 10mm; size: A4; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #000; padding: 0; }
+body { font-family: 'Consolas', 'Menlo', 'Courier New', monospace; font-size: 11px; color: #000; padding: 0; }
 .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 15px; }
 .header h1 { font-size: 24px; letter-spacing: 2px; }
 .header p { font-size: 11px; color: #555; margin-top: 4px; }
@@ -824,6 +794,22 @@ function escposText(str) {
   return Buffer.from(str + "\r\n", "latin1");
 }
 
+function escposTextUTF8(str) {
+  return Buffer.from(str + "\r\n", "utf8");
+}
+
+function escposCodePage(n) {
+  return Buffer.from([0x1B, 0x74, n]);
+}
+
+function escposFont(n) {
+  return Buffer.from([0x1B, 0x4D, n]);
+}
+
+function escposCharSize(h, w) {
+  return Buffer.from([0x1D, 0x21, (h << 4) | w]);
+}
+
 function escposLine(char, len) {
   return Buffer.from(char.repeat(len) + "\r\n", "latin1");
 }
@@ -835,73 +821,91 @@ function escposFeed(n) {
 function generateESCPOSReceipt(sale) {
   const items = sale.items || [];
   const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const yy = String(now.getFullYear()).slice(-2);
-  const invNumber = "INV-" + dd + "-" + mm + "-" + yy;
   const totalAmount = sale.total || 0;
-  const customerArrears = sale.customer_total_arrears || 0;
+  const paidAmount = sale.amount_paid || 0;
+  const changeDue = sale.change || 0;
+  const discount = sale.discount || 0;
+  const balance = Math.max(0, totalAmount - paidAmount);
+  const L = 56;
   const parts = [];
 
   parts.push(escposInit());
+  parts.push(escposFont(1));
   parts.push(escposAlign(1));
   parts.push(escposBold(1));
+  parts.push(escposCharSize(1, 0));
   parts.push(escposText("Faraz Medical Store"));
+  parts.push(escposCharSize(0, 0));
   parts.push(escposBold(0));
   parts.push(escposText("Beside Noman Clinical Laboratory, Barikot"));
-  parts.push(escposLine("=", 32));
+  parts.push(escposLine("=", L));
   parts.push(escposAlign(0));
+
   const dateStr = now.toLocaleDateString("en-PK", {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
   parts.push(escposText("Date: " + dateStr));
-  parts.push(escposText("Invoice #: " + invNumber));
+  parts.push(escposText("Invoice #: " + (sale.id || "")));
   parts.push(escposText("Customer: " + (sale.customer_name || "Walk-in Customer")));
-  parts.push(escposLine("-", 32));
-  parts.push(escposText("Item                    QTY   Amount"));
-  parts.push(escposLine("-", 32));
+  parts.push(escposLine("-", L));
+
+  const colName = 28;
+  const colQty = 6;
+  const colUnit = 8;
+  const colAmt = 10;
+  parts.push(escposText(
+    "Item".padEnd(colName) +
+    "Qty".padStart(colQty) +
+    "Price".padStart(colUnit) +
+    "Amount".padStart(colAmt)
+  ));
+  parts.push(escposLine("-", L));
 
   items.forEach(item => {
-    const name = (item.product_name || "").padEnd(20).slice(0, 20);
-    const qty = String(item.quantity).padStart(4);
-    const unitPrice = item.subtotal / item.quantity;
-    const displayAmt = String(unitPrice.toFixed(0)) + " x " + item.quantity;
-    const amt = displayAmt.padStart(10);
-    parts.push(escposText(name + " " + qty + "  " + amt));
+    const name = (item.product_name || "").padEnd(colName).slice(0, colName);
+    const qty = String(item.quantity).padStart(colQty);
+    const unitPrice = String(Math.round(item.subtotal / item.quantity)).padStart(colUnit);
+    const amount = String(item.subtotal.toFixed(0)).padStart(colAmt);
+    parts.push(escposText(name + qty + unitPrice + amount));
   });
 
-  parts.push(escposLine("-", 32));
+  parts.push(escposLine("-", L));
 
-  if (customerArrears > 0) {
-    parts.push(escposText("Arrears" + " ".repeat(22) + customerArrears.toFixed(0).padStart(8)));
+  function addLine(label, valueStr, isBold) {
+    const line = label.padEnd(colName) + "".padStart(colQty + colUnit) + valueStr.padStart(colAmt);
+    if (isBold) parts.push(escposBold(1));
+    parts.push(escposText(line));
+    if (isBold) parts.push(escposBold(0));
   }
 
-  if (sale.discount > 0) {
-    parts.push(escposText("Discount" + " ".repeat(20) + "-" + sale.discount.toFixed(0).padStart(7)));
+  addLine("SUBTOTAL", totalAmount.toFixed(0));
+  if (discount > 0) {
+    addLine("DISCOUNT", "-" + discount.toFixed(0));
   }
-
-  parts.push(escposLine("-", 32));
-  parts.push(escposBold(1));
-  parts.push(escposText("Total Amount" + " ".repeat(15) + totalAmount.toFixed(0).padStart(8)));
-  parts.push(escposBold(0));
-  parts.push(escposLine("=", 32));
+  addLine("GST (0%)", "0");
+  addLine("TOTAL", totalAmount.toFixed(0), true);
+  addLine("Amount Paid", paidAmount.toFixed(0));
+  if (balance > 0) {
+    addLine("Balance", balance.toFixed(0));
+  } else if (changeDue > 0) {
+    addLine("Change", changeDue.toFixed(0));
+  }
+  parts.push(escposLine("=", L));
 
   if (sale.status === "partial") {
     parts.push(escposAlign(1));
     parts.push(escposBold(1));
     parts.push(escposText("** PARTIAL PAYMENT **"));
     parts.push(escposBold(0));
+    parts.push(escposAlign(0));
   }
 
+  parts.push(escposText(""));
   parts.push(escposAlign(1));
   parts.push(escposFeed(1));
-  parts.push(escposText("Thank you for your visit"));
-  parts.push(escposText(""));
-  parts.push(escposAlign(0));
-  parts.push(escposText("\u00A9 2026 Mustafa Tawab"));
+  parts.push(escposText("Thank You For Your Visit!"));
   parts.push(escposFeed(3));
-
   parts.push(escposCut(true));
 
   return Buffer.concat(parts);
@@ -914,37 +918,48 @@ function generateESCPOSReturnReceipt(returnData, sale) {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit"
   });
+  const L = 56;
   const parts = [];
 
   parts.push(escposInit());
+  parts.push(escposFont(1));
   parts.push(escposAlign(1));
   parts.push(escposBold(1));
+  parts.push(escposCharSize(1, 0));
   parts.push(escposText("FARAZ PHARMACY"));
+  parts.push(escposCharSize(0, 0));
   parts.push(escposBold(0));
   parts.push(escposText(dateStr));
-  parts.push(escposLine("=", 32));
+  parts.push(escposLine("=", L));
   parts.push(escposBold(1));
   parts.push(escposText("** RETURN RECEIPT **"));
   parts.push(escposBold(0));
   parts.push(escposText("Sale: " + (sale?.id?.slice(0, 8) || "N/A")));
-  parts.push(escposLine("-", 32));
+  parts.push(escposLine("-", L));
   parts.push(escposAlign(0));
-  parts.push(escposText("Item                     Refund"));
-  parts.push(escposLine("-", 32));
+  const colName = 44;
+  const colAmt = 12;
+  parts.push(escposText(
+    "Item description".padEnd(colName) +
+    "Refund".padStart(colAmt)
+  ));
+  parts.push(escposLine("-", L));
 
   items.forEach(i => {
     const reasonStr = i.reason ? " (" + i.reason + ")" : "";
-    const name = (i.product_name + " x" + i.quantity + reasonStr).padEnd(24).slice(0, 24);
-    const amt = String((i.refund_amount ?? i.subtotal ?? 0).toFixed(0)).padStart(8);
-    parts.push(escposText(name + " " + amt));
+    const name = (i.product_name + " x" + i.quantity + reasonStr).padEnd(colName).slice(0, colName);
+    const amt = String((i.refund_amount ?? i.subtotal ?? 0).toFixed(0)).padStart(colAmt);
+    parts.push(escposText(name + amt));
   });
 
-  parts.push(escposLine("-", 32));
+  parts.push(escposLine("-", L));
   parts.push(escposBold(1));
-  parts.push(escposText("Total Refund" + " ".repeat(14) + returnData.refund_amount.toFixed(0).padStart(8)));
+  const totalLabel = "Total Refund".padEnd(colName);
+  const totalVal = returnData.refund_amount.toFixed(0).padStart(colAmt);
+  parts.push(escposText(totalLabel + totalVal));
   parts.push(escposBold(0));
   parts.push(escposText("Reason: " + returnData.reason));
-  parts.push(escposLine("=", 32));
+  parts.push(escposLine("=", L));
   parts.push(escposAlign(1));
   parts.push(escposText("Return processed successfully"));
   parts.push(escposFeed(3));

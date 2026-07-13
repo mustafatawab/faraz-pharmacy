@@ -1,5 +1,5 @@
 import { prisma } from "../../services/prisma";
-import { BadRequestError } from "../../utils/errors";
+import { BadRequestError, NotFoundError } from "../../utils/errors";
 import { emitEvent } from "../../socket";
 import type { CreateReturnInput } from "./returns.schema";
 import { Prisma } from "../../generated/prisma/client";
@@ -8,7 +8,23 @@ export const returnsService = {
   async list() {
     return prisma.returnEntry.findMany({
       orderBy: { createdAt: "desc" },
+      include: {
+        items: true,
+        sale: { include: { customer: { select: { name: true } } } },
+      },
     });
+  },
+
+  async getById(id: string) {
+    const entry = await prisma.returnEntry.findUnique({
+      where: { id },
+      include: {
+        items: true,
+        sale: { include: { customer: { select: { name: true } } } },
+      },
+    });
+    if (!entry) throw new NotFoundError("Return");
+    return entry;
   },
 
   async create(data: CreateReturnInput) {
@@ -41,7 +57,14 @@ export const returnsService = {
         });
       }
 
-      const result = await tx.returnEntry.findUnique({ where: { id: returnEntry.id } });
+      const result = await tx.returnEntry.findUnique({
+        where: { id: returnEntry.id },
+        include: {
+          items: true,
+          sale: { include: { customer: { select: { name: true } } } },
+        },
+      });
+
       emitEvent("return:created", result);
       return result;
     });

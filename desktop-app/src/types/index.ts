@@ -203,9 +203,15 @@ export interface CompanyInput {
 export interface ReturnEntry {
   id: string;
   sale_id: string;
+  customer_name?: string;
   refund_amount: number;
   reason: string;
   created_at: string;
+  items?: Array<{
+    product_name: string;
+    quantity: number;
+    refund_amount: number;
+  }>;
 }
 
 export interface ReturnItemInput {

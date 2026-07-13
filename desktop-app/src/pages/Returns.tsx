@@ -29,6 +29,8 @@ export default function Returns() {
   const [reason, setReason] = useState("");
   const [returnQtys, setReturnQtys] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
+  const [printDialog, setPrintDialog] = useState<{ open: boolean; returnData: ReturnEntry | null; sale: Sale | null }>({ open: false, returnData: null, sale: null });
+  const [selectedReturn, setSelectedReturn] = useState<ReturnEntry | null>(null);
 
   useEffect(() => {
     if (window.electronAPI?.printers) {
@@ -71,28 +73,13 @@ export default function Returns() {
         items,
       });
     },
-    onSuccess: async (returnData) => {
+    onSuccess: (returnData) => {
       toast.success("Return processed");
       queryClient.invalidateQueries({ queryKey: ["returns"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["sales-by-date"] });
 
-      if (window.printReturnReceipt && selectedSale) {
-        const printPayload = {
-          ...returnData,
-          items: Object.entries(returnQtys)
-            .filter(([_, qty]) => qty > 0)
-            .map(([productId, quantity]) => {
-              const item = selectedSale.items?.find((i: SaleItem) => i.product_id === productId);
-              return { product_name: item?.product_name || "", quantity, refund_amount: (item?.unit_price || 0) * quantity };
-            }),
-          reason,
-        };
-        const printResult = await window.printReturnReceipt(printPayload, selectedSale, printerConfig);
-        if (!printResult.success) {
-          setError(printResult.error || "Print failed");
-        }
-      }
+      setPrintDialog({ open: true, returnData, sale: selectedSale });
 
       setOpen(false);
       setSelectedSaleId("");
@@ -106,9 +93,24 @@ export default function Returns() {
     },
   });
 
+  async function handlePrintReceipt() {
+    if (!printDialog.returnData || !printDialog.sale) return;
+    const printPayload = {
+      ...printDialog.returnData,
+      items: printDialog.returnData.items || [],
+      reason: printDialog.returnData.reason,
+    };
+    const result = await window.printReturnReceipt(printPayload, printDialog.sale, printerConfig);
+    if (!result.success) {
+      toast.error("Print failed: " + (result.error || "Unknown error"));
+    }
+    setPrintDialog({ open: false, returnData: null, sale: null });
+  }
+
   const columns = [
     { key: "created_at", header: "Date", cell: (r: ReturnEntry) => <span className="font-mono text-xs text-text-secondary">{formatDateTime(r.created_at)}</span> },
     { key: "sale_id", header: "Sale ID", cell: (r: ReturnEntry) => <span className="font-mono text-xs text-text-secondary">{r.sale_id.slice(0, 8)}</span> },
+    { key: "customer_name", header: "Customer", cell: (r: ReturnEntry) => <span className="text-text-secondary">{r.customer_name || "—"}</span> },
     { key: "refund_amount", header: "Refund Amount", cell: (r: ReturnEntry) => <span className="font-mono font-medium text-danger">{formatCurrency(r.refund_amount)}</span> },
     { key: "reason", header: "Reason", cell: (r: ReturnEntry) => <span className="text-text-secondary">{r.reason}</span> },
   ];
@@ -121,15 +123,21 @@ export default function Returns() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
           <Input placeholder="Search returns..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Button variant="outline" size="sm" onClick={() => downloadCSV(`returns_${new Date().toISOString().split("T")[0]}.csv`, ["Date","Sale ID","Refund Amount","Reason"], filtered.map((r: ReturnEntry) => [r.created_at, r.sale_id, r.refund_amount, r.reason]))}>
+        <Button variant="outline" size="sm" onClick={() => downloadCSV(`returns_${new Date().toISOString().split("T")[0]}.csv`, ["Date","Sale ID","Customer","Refund Amount","Reason"], filtered.map((r: ReturnEntry) => [r.created_at, r.sale_id, r.customer_name || "", r.refund_amount, r.reason]))}>
           <Download className="h-4 w-4 mr-1" /> CSV
         </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadPDF(`returns_${new Date().toISOString().split("T")[0]}.pdf`, "Returns List", ["Date","Sale ID","Refund Amount","Reason"], filtered.map((r: ReturnEntry) => [r.created_at, r.sale_id, r.refund_amount, r.reason]))}>
+        <Button variant="outline" size="sm" onClick={() => downloadPDF(`returns_${new Date().toISOString().split("T")[0]}.pdf`, "Returns List", ["Date","Sale ID","Customer","Refund Amount","Reason"], filtered.map((r: ReturnEntry) => [r.created_at, r.sale_id, r.customer_name || "", r.refund_amount, r.reason]))}>
           <Download className="h-4 w-4 mr-1" /> PDF
         </Button>
       </div>
       <div className="rounded-xl border border-border">
-        <DataTable columns={columns} data={filtered} loading={isLoading} keyExtractor={(r: ReturnEntry) => r.id} />
+        <DataTable
+          columns={columns}
+          data={filtered}
+          loading={isLoading}
+          keyExtractor={(r: ReturnEntry) => r.id}
+          onRowClick={(r: ReturnEntry) => setSelectedReturn(r)}
+        />
       </div>
 
       <Dialog open={open} onOpenChange={(v) => {
@@ -264,6 +272,51 @@ export default function Returns() {
               {createMutation.isPending ? "Processing..." : "Process Return"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={printDialog.open} onOpenChange={(o) => { if (!o) setPrintDialog({ open: false, returnData: null, sale: null }); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="h-4 w-4" />
+              Print Return Receipt?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="px-5 pb-5 flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setPrintDialog({ open: false, returnData: null, sale: null })}>No</Button>
+            <Button onClick={handlePrintReceipt}>Yes, Print</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedReturn} onOpenChange={(v) => { if (!v) setSelectedReturn(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Return Details</DialogTitle></DialogHeader>
+          {selectedReturn && (
+            <div className="px-5 pb-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-text-secondary">Sale ID:</span> <span className="font-mono">{selectedReturn.sale_id}</span></div>
+                <div><span className="text-text-secondary">Customer:</span> <span>{selectedReturn.customer_name || "—"}</span></div>
+                <div><span className="text-text-secondary">Date:</span> <span>{formatDateTime(selectedReturn.created_at)}</span></div>
+                <div><span className="text-text-secondary">Refund:</span> <span className="font-mono text-danger">{formatCurrency(selectedReturn.refund_amount)}</span></div>
+                <div className="col-span-2"><span className="text-text-secondary">Reason:</span> <span>{selectedReturn.reason}</span></div>
+              </div>
+              {selectedReturn.items && selectedReturn.items.length > 0 && (
+                <div>
+                  <Label className="mb-1 block">Items Returned</Label>
+                  <div className="border border-border rounded-lg divide-y divide-border text-sm">
+                    {selectedReturn.items.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-2">
+                        <span>{item.product_name} × {item.quantity}</span>
+                        <span className="font-mono">{formatCurrency(item.refund_amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
