@@ -5,151 +5,326 @@ const { usb } = require("usb");
 
 const logoPath = `file://${path.join(__dirname, "image", "logo.png").replace(/\\/g, "/")}`;
 
-
-
 function generateSaleReceiptHTML(sale) {
 
   const items = sale.items || [];
+
   const now = new Date();
+
   const dateStr = now.toLocaleDateString("en-PK", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit"
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
   });
+
   const totalAmount = sale.total || 0;
   const paid = sale.amount_paid || 0;
   const balance = Math.max(0, totalAmount - paid);
-  const changeDue = sale.change || 0;
-  const discount = sale.discount || 0;
-
-  const itemsHTML = items.map(item => {
-    const unitPrice = item.unit_price || (item.subtotal / item.quantity);
-    return `
-      <tr>
-        <td>${item.product_name}</td>
-        <td class="r">${item.quantity}</td>
-        <td class="r">${Math.round(unitPrice)}</td>
-        <td class="r b">${Math.round(item.subtotal)}</td>
-      </tr>`;
-  }).join("");
+  const arrears = sale.arrears || 0;
 
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+
 <style>
 @page { size: 80mm auto; margin: 0; }
+
 body {
-  width: 80mm;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, "Lucida Console", monospace;;
-  font-size: 16px;
-  margin: 0;
-  padding: 5mm;
+  width: 300px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
   color: #000;
+  padding: 8px;
 }
+
 .center { text-align: center; }
-.b { font-weight: 700; }
-.header { font-weight: bold; font-size: 16px;}
-.sub { font-size: 12px; color: #333; margin: 2px 0; }
-.divider { border-top: 1px dashed #888; margin: 6px 0; }
-.thick { border-top: 2px solid #000; margin: 6px 0; }
+.header { font-weight: bold; font-size: 18px; }
+.small { font-size: 10px; }
+
+.divider { border-top: 1px dashed #000; margin: 8px 0; }
+
 table { width: 100%; border-collapse: collapse; }
+
 th {
   border-bottom: 1px solid #000;
   text-align: left;
   font-size: 11px;
-  padding: 4px 0;
-  letter-spacing: 1px;
 }
-td { padding: 2px 0; font-size: 12px; }
-.r { text-align: right; }
-.lines td { padding: 3px 0; }
 
-.urdu{
- display: flex;
- flex-direction: columns;
- align-items: center;
- justify-content: center;
+td { padding: 2px 0; }
+
+.text-right { text-align: right; }
+
+.total-box {
+  border-top: 2px solid #000;
+  border-bottom: 2px solid #000;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.urdu {
+  direction: rtl;
+  font-family: Arial, sans-serif;
+  font-size: 11px;
 }
 </style>
+
 </head>
+
 <body>
 
 <div class="center">
-  <div class="header">FARAZ MEDICAL STORE</div>
-  <div class="sub">Beside Noman Clinical Laboratory, Barikot</div>
-  <div class="sub">Phone: 03469383792 / 03449006940</div>
+  <div class="header">FARAZ PHARMACY</div>
+  <div class="small">Near Civil Hospital Barikot, Swat</div>
+  <div class="small">Phone: 03469383792 / 03449006940</div>
 </div>
 
 <div class="divider"></div>
 
-<div style="font-size:11px;">
-  <div>Date: ${dateStr}</div>
-  <div>Invoice #: ${sale.id || ""}</div>
-  <div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
-</div>
+<div>Invoice #: ${sale.id || Math.floor(Math.random() * 100000)}</div>
+<div>Date: ${dateStr}</div>
+<div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
+<div>No. of items: ${items.length}</div>
 
 <div class="divider"></div>
-
-<div style="font-size:11px; margin-bottom:4px;">No. of Items: ${items.length}</div>
 
 <table>
   <thead>
     <tr>
       <th>Product</th>
-      <th class="r">Qty</th>
-      <th class="r">Price</th>
-      <th class="r">Amount</th>
+      <th>Qty</th>
+      <th class="text-right">Amount</th>
     </tr>
   </thead>
-  <tbody>${itemsHTML}</tbody>
+
+  <tbody>
+    ${items.map(item => `
+      <tr>
+        <td>${item.product_name}</td>
+        <td>${item.quantity}</td>
+        <td class="text-right">${item.subtotal.toFixed(0)}</td>
+      </tr>
+    `).join("")}
+  </tbody>
 </table>
 
 <div class="divider"></div>
 
-<table class="lines">
-  <tr><td style="width:70%">Total Amount</td><td class="r">${Math.round(totalAmount)}</td></tr>
-  ${discount > 0 ? `<tr><td>Discount</td><td class="r">-${Math.round(discount)}</td></tr>` : ""}
-  <tr><td>GST (0%)</td><td class="r">0</td></tr>
-</table>
+<table>
+  <tr>
+    <td>Subtotal</td>
+    <td class="text-right">${sale.subtotal.toFixed(0)}</td>
+  </tr>
 
-<div class="thick"></div>
+  ${sale.discount > 0 ? `
+  <tr>
+    <td>Discount</td>
+    <td class="text-right">-${sale.discount.toFixed(0)}</td>
+  </tr>` : ""}
 
-<table class="lines">
-  <tr><td style="width:70%" class="b">Total Payable</td><td class="r b">${Math.round(totalAmount)}</td></tr>
-  <tr><td>Amount Paid</td><td class="r">${Math.round(paid)}</td></tr>
-  ${balance > 0
-    ? `<tr><td>Balance</td><td class="r">${Math.round(balance)}</td></tr>`
-    : changeDue > 0
-      ? `<tr><td>Change</td><td class="r">${Math.round(changeDue)}</td></tr>`
-      : ""}
+  <tr class="total-box">
+    <td>TOTAL</td>
+    <td class="text-right">${totalAmount.toFixed(0)}</td>
+  </tr>
+
+  <tr>
+    <td>Paid</td>
+    <td class="text-right">${paid.toFixed(0)}</td>
+  </tr>
+
+  <tr>
+    <td>Balance</td>
+    <td class="text-right">${balance.toFixed(0)}</td>
+  </tr>
+
+  <tr>
+    <td>Arrears</td>
+    <td class="text-right">${arrears.toFixed(0)}</td>
+  </tr>
 </table>
 
 <div class="divider"></div>
 
-<div style="text-align:center;">
-  <div class="urdu">
-   <span>
-    No return without receipt
-    </span>
-    <span>
-    No return of freezer/refrigerator medicines
-    </span>
+<table>
+  <tr>
+    <td class="urdu">
+      <b>ضروری نوٹ</b><br>
+      - رسید کے بغیر کوئی واپسی نہیں<br>
+      - دوائیوں کی واپسی ممکن نہیں<br>
+      - 3 دن بعد کوئی واپسی نہیں
+    </td>
+  </tr>
+</table>
 
-    <span>
-    No return after 3 days
-    </span>
-  </div>
+<div class="divider"></div>
+
+<div class="center">
+  <b>
+    ${sale.status === "partial"
+      ? "PARTIAL PAYMENT"
+      : "PAYMENT RECEIVED"
+    }
+  </b>
 </div>
 
 <div class="divider"></div>
 
-<div class="center" style="font-size:10px; color:#555;">
-  THANK YOU FOR YOUR VISIT
+<div class="center small">
+  THANK YOU FOR YOUR VISIT<br>
+  Get Well Soon ❤️<br><br>
+  Powered by Faraz Pharmacy POS
 </div>
 
 </body>
 </html>`;
 }
+
+// function generateSaleReceiptHTML(sale) {
+
+//   const items = sale.items || [];
+//   const now = new Date();
+//   const dateStr = now.toLocaleDateString("en-PK", {
+//     day: "2-digit", month: "2-digit", year: "numeric",
+//     hour: "2-digit", minute: "2-digit"
+//   });
+//   const totalAmount = sale.total || 0;
+//   const paid = sale.amount_paid || 0;
+//   const balance = Math.max(0, totalAmount - paid);
+//   const changeDue = sale.change || 0;
+//   const discount = sale.discount || 0;
+
+//   const itemsHTML = items.map(item => {
+//     const unitPrice = item.unit_price || (item.subtotal / item.quantity);
+//     return `
+//       <tr>
+//         <td>${item.product_name}</td>
+//         <td class="r">${item.quantity}</td>
+//         <td class="r">${Math.round(unitPrice)}</td>
+//         <td class="r b">${Math.round(item.subtotal)}</td>
+//       </tr>`;
+//   }).join("");
+
+//   return `<!DOCTYPE html>
+// <html>
+// <head>
+// <meta charset="utf-8">
+// <style>
+// @page { size: 80mm auto; margin: 0; }
+// body {
+//   width: 80mm;
+//   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, "Lucida Console", monospace;;
+//   font-size: 16px;
+//   margin: 0;
+//   padding: 5mm;
+//   color: #000;
+// }
+// .center { text-align: center; }
+// .b { font-weight: 700; }
+// .header { font-weight: bold; font-size: 16px;}
+// .sub { font-size: 12px; color: #333; margin: 2px 0; }
+// .divider { border-top: 1px dashed #888; margin: 6px 0; }
+// .thick { border-top: 2px solid #000; margin: 6px 0; }
+// table { width: 100%; border-collapse: collapse; }
+// th {
+//   border-bottom: 1px solid #000;
+//   text-align: left;
+//   font-size: 11px;
+//   padding: 4px 0;
+//   letter-spacing: 1px;
+// }
+// td { padding: 2px 0; font-size: 12px; }
+// .r { text-align: right; }
+// .lines td { padding: 3px 0; }
+
+// .urdu{
+//  display: flex;
+//  flex-direction: columns;
+//  align-items: center;
+//  justify-content: center;
+// }
+// </style>
+// </head>
+// <body>
+
+// <div class="center">
+//   <div class="header">FARAZ MEDICAL STORE</div>
+//   <div class="sub">Beside Noman Clinical Laboratory, Barikot</div>
+//   <div class="sub">Phone: 03469383792 / 03449006940</div>
+// </div>
+
+// <div class="divider"></div>
+
+// <div style="font-size:11px;">
+//   <div>Date: ${dateStr}</div>
+//   <div>Invoice #: ${sale.id || ""}</div>
+//   <div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
+// </div>
+
+// <div class="divider"></div>
+
+// <div style="font-size:11px; margin-bottom:4px;">No. of Items: ${items.length}</div>
+
+// <table>
+//   <thead>
+//     <tr>
+//       <th>Product</th>
+//       <th class="r">Qty</th>
+//       <th class="r">Price</th>
+//       <th class="r">Amount</th>
+//     </tr>
+//   </thead>
+//   <tbody>${itemsHTML}</tbody>
+// </table>
+
+// <div class="divider"></div>
+
+// <table class="lines">
+//   <tr><td style="width:70%">Total Amount</td><td class="r">${Math.round(totalAmount)}</td></tr>
+//   ${discount > 0 ? `<tr><td>Discount</td><td class="r">-${Math.round(discount)}</td></tr>` : ""}
+//   <tr><td>GST (0%)</td><td class="r">0</td></tr>
+// </table>
+
+// <div class="thick"></div>
+
+// <table class="lines">
+//   <tr><td style="width:70%" class="b">Total Payable</td><td class="r b">${Math.round(totalAmount)}</td></tr>
+//   <tr><td>Amount Paid</td><td class="r">${Math.round(paid)}</td></tr>
+//   ${balance > 0
+//     ? `<tr><td>Balance</td><td class="r">${Math.round(balance)}</td></tr>`
+//     : changeDue > 0
+//       ? `<tr><td>Change</td><td class="r">${Math.round(changeDue)}</td></tr>`
+//       : ""}
+// </table>
+
+// <div class="divider"></div>
+
+// <div style="text-align:center;">
+//   <div class="urdu">
+//    <span>
+//     No return without receipt
+//     </span>
+//     <span>
+//     No return of freezer/refrigerator medicines
+//     </span>
+
+//     <span>
+//     No return after 3 days
+//     </span>
+//   </div>
+// </div>
+
+// <div class="divider"></div>
+
+// <div class="center" style="font-size:10px; color:#555;">
+//   THANK YOU FOR YOUR VISIT
+// </div>
+
+// </body>
+// </html>`;
+// }
 
 
 function generateA4InvoiceHTML(sale) {
@@ -1102,15 +1277,11 @@ function writeTempFile(content, ext) {
   return filePath;
 }
 
-function doPrintJob(data, printerConfig) {
+function doPrintJob(htmlContent, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
 
-  if (paperSize === "thermal") {
-    return doUSBPrint(data);
-  }
-
   return new Promise((resolve, reject) => {
-    const filePath = writeTempFile(data, "html");
+    const filePath = writeTempFile(htmlContent, "html");
 
     const printWin = new BrowserWindow({
       width: paperSize === "a4" ? 800 : 600,
@@ -1166,11 +1337,6 @@ function doPrintJob(data, printerConfig) {
 function printReceipt(sale, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
   console.log(`printReceipt: paperSize=${paperSize} items=${(sale.items || []).length} total=${sale.total}`);
-  if (paperSize === "thermal") {
-    const data = generateESCPOSReceipt(sale);
-    console.log(`printReceipt: generated ESC/POS data length=${data.length}`);
-    return doPrintJob(data, printerConfig);
-  }
   const html = generateHTML(sale, paperSize);
   console.log(`printReceipt: generated HTML length=${html.length}`);
   return doPrintJob(html, printerConfig);
@@ -1178,10 +1344,6 @@ function printReceipt(sale, printerConfig) {
 
 function printReturnReceipt(returnData, sale, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
-  if (paperSize === "thermal") {
-    const data = generateESCPOSReturnReceipt(returnData, sale);
-    return doPrintJob(data, printerConfig);
-  }
   const html = generateReturnReceiptHTML(returnData, sale, paperSize);
   return doPrintJob(html, printerConfig);
 }
