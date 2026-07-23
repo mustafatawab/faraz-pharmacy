@@ -1,7 +1,10 @@
-const { BrowserWindow, app } = require("electron");
-const path = require("path");
-const fs = require("fs");
-const { usb } = require("usb");
+import { BrowserWindow, app } from "electron";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import { usb } from "usb";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const logoPath = `file://${path.join(__dirname, "image", "logo.png").replace(/\\/g, "/")}`;
 
@@ -1215,4 +1218,6 @@ async function listUSBPrinters() {
   return printers;
 }
 
-module.exports = { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters };
+
+
+export { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters };
