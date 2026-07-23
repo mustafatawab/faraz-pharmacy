@@ -2,13 +2,10 @@
   "name": "faraz-pharmacy-server",
   "version": "1.0.0",
   "private": true,
-<<<<<<< HEAD
-=======
   "type": "module",
   "engines": {
     "node": ">=18.0.0"
   },
->>>>>>> 52ad73f8aa92cec118d57f46d40b6dc86992d39c
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsup src/server.ts --format esm --out-dir dist --clean --dts --sourcemap --external @prisma/client --external @prisma/adapter-pg --external pg",
