@@ -5,15 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Eye, EyeOff, Lock, ArrowLeft, Sun, Moon } from "lucide-react";
+import { Eye, EyeOff, Lock, Sun, Moon } from "lucide-react";
 import { api } from "@/lib/api";
 import logoSrc from "@/asset/image/logo.png";
 
-interface LoginProps {
-  onBackToSetup?: () => void;
-}
-
-export default function Login({ onBackToSetup }: LoginProps) {
+export default function Login() {
   const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -167,15 +163,6 @@ export default function Login({ onBackToSetup }: LoginProps) {
               >
                 Forgot password?
               </button>
-              {onBackToSetup && (
-                <button
-                  type="button"
-                  onClick={onBackToSetup}
-                  className="text-xs text-text-secondary hover:text-accent transition-colors"
-                >
-                  Back to setup
-                </button>
-              )}
             </div>
           </form>
         </motion.div>

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Toaster } from "sonner";
@@ -7,7 +7,6 @@ import { ServerConnectionProvider } from "@/contexts/ServerConnectionContext";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import OfflineBanner from "@/components/shared/OfflineBanner";
-import FirstLaunch from "@/components/setup/FirstLaunch";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import POS from "@/pages/POS";
@@ -43,29 +42,16 @@ function AnimatedPage({ children }: { children: React.ReactNode }) {
 function AppShell() {
   const { isAuthenticated } = useAuth();
   const [ready, setReady] = useState(false);
-  const [showWizard, setShowWizard] = useState(true);
-  const prevAuth = useRef(isAuthenticated);
   const location = useLocation();
 
   useEffect(() => {
     setReady(true);
   }, []);
 
-  useEffect(() => {
-    if (prevAuth.current === true && isAuthenticated === false) {
-      setShowWizard(true);
-    }
-    prevAuth.current = isAuthenticated;
-  }, [isAuthenticated]);
-
   if (!ready) return null;
 
-  if (showWizard) {
-    return <FirstLaunch onComplete={() => { setShowWizard(false); }} />;
-  }
-
   if (!isAuthenticated) {
-    return <Login onBackToSetup={() => setShowWizard(true)} />;
+    return <Login />;
   }
 
   return (
