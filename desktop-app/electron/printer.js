@@ -38,17 +38,21 @@ function generateSaleReceiptHTML(sale) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-PK", {
     day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
   });
+  const timeStr = now.toLocaleTimeString("en-PK", {
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
+  const subtotal = sale.subtotal || 0;
   const totalAmount = sale.total || 0;
+  const discount = sale.discount || 0;
   const paid = sale.amount_paid || 0;
   const balance = Math.max(0, totalAmount - paid);
   const changeDue = sale.change || 0;
-  const discount = sale.discount || 0;
+  const gst = sale.gst || 0;
 
   const itemsHTML = items.map(item => {
     const unitPrice = item.unit_price || item.subtotal / item.quantity;
-    return `<tr><td>${item.product_name}</td><td class="r">${item.quantity}</td><td class="r">${Math.round(unitPrice)}</td><td class="r b">${Math.round(item.subtotal)}</td></tr>`;
+    return `<tr><td>${item.product_name}</td><td class="r">${item.quantity}</td><td class="r">${Math.round(unitPrice)}</td><td class="r">${Math.round(item.subtotal)}</td></tr>`;
   }).join("");
 
   return `<!DOCTYPE html>
@@ -59,13 +63,13 @@ function generateSaleReceiptHTML(sale) {
 @page { size: 80mm auto; margin: 0; }
 body {
   width: 76mm; margin: 0; padding: 3mm 2mm;
-  font-family: 'Courier New', Courier, 'Lucida Console', monospace;
+  font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 13px; color: #000; line-height: 1.3;
 }
 .c { text-align: center; }
 .r { text-align: right; }
 .b { font-weight: 700; }
-.hdr { font-weight: 700; font-size: 15px; letter-spacing: 1px; }
+.hdr { font-weight: 700; font-size: 16px; letter-spacing: 1px; }
 .sub { font-size: 10px; color: #444; margin: 1px 0; }
 .dash { border: none; border-top: 1px dashed #999; margin: 4px 0; }
 .thick { border: none; border-top: 2px solid #000; margin: 5px 0; }
@@ -73,32 +77,29 @@ table { width: 100%; border-collapse: collapse; }
 th { border-bottom: 1px solid #000; text-align: left; font-size: 10px; padding: 3px 0; letter-spacing: 0.5px; }
 td { padding: 1.5px 0; font-size: 11px; }
 .lines td { padding: 2px 0; }
-.ret { text-align: center; font-size: 9px; color: #555; line-height: 1.4; }
+.ret { text-align: center; font-size: 10px; color: #333; line-height: 1.6; font-weight: 600; }
 </style>
 </head>
 <body>
 
 <div class="c">
-  <div class="hdr">FARAZ MEDICAL STORE</div>
+  <div class="hdr">Faraz Pharmacy</div>
   <div class="sub">Beside Noman Clinical Laboratory, Barikot</div>
-  <div class="sub">Phone: 03469383792 / 03449006940</div>
 </div>
 
 <hr class="dash">
 
 <div style="font-size:10px;">
-  <div>Date: ${dateStr}</div>
+  <div>Date: ${dateStr}  ${timeStr}</div>
   <div>Invoice #: ${sale.id || ""}</div>
   <div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
 </div>
 
 <hr class="dash">
 
-<div style="font-size:10px; margin-bottom:2px;">Items: ${items.length}</div>
-
 <table>
   <thead>
-    <tr><th>Product</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Amt</th></tr>
+    <tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Amount</th></tr>
   </thead>
   <tbody>${itemsHTML}</tbody>
 </table>
@@ -106,30 +107,32 @@ td { padding: 1.5px 0; font-size: 11px; }
 <hr class="dash">
 
 <table class="lines">
-  <tr><td style="width:60%">Total</td><td class="r">${Math.round(totalAmount)}</td></tr>
+  <tr><td style="width:55%">Sub Total</td><td class="r">${Math.round(subtotal)}</td></tr>
   ${discount > 0 ? `<tr><td>Discount</td><td class="r">-${Math.round(discount)}</td></tr>` : ""}
+  <tr><td>GST (0%)</td><td class="r">${Math.round(gst)}</td></tr>
+  <tr class="b"><td>Total Amount</td><td class="r">${Math.round(totalAmount)}</td></tr>
 </table>
 
 <hr class="thick">
 
 <table class="lines">
-  <tr><td style="width:60%" class="b">Payable</td><td class="r b">${Math.round(totalAmount)}</td></tr>
-  <tr><td>Paid</td><td class="r">${Math.round(paid)}</td></tr>
-  ${balance > 0 ? `<tr><td>Balance</td><td class="r">${Math.round(balance)}</td></tr>` : changeDue > 0 ? `<tr><td>Change</td><td class="r">${Math.round(changeDue)}</td></tr>` : ""}
+  ${balance > 0 ? `<tr><td style="width:55%">Balance</td><td class="r">${Math.round(balance)}</td></tr>` : ""}
+  ${changeDue > 0 ? `<tr><td style="width:55%">Change</td><td class="r">${Math.round(changeDue)}</td></tr>` : ""}
 </table>
 
 <hr class="dash">
 
 <div class="ret">
-  No return without receipt<br>
-  No return of freezer/refrigerator medicines<br>
-  No return after 3 days
+  <b>ضروری نوٹ</b><br>
+  - رسید کے بغیر کوئی واپسی نہیں<br>
+  - دوائیوں کی واپسی ممکن نہیں<br>
+  - 3 دن بعد کوئی واپسی نہیں
 </div>
 
 <hr class="dash">
 
 <div class="c" style="font-size:10px; color:#555;">
-  THANK YOU FOR YOUR VISIT
+  Thank you for your visit !
 </div>
 
 </body>
@@ -727,73 +730,6 @@ function isPrinterInterface(iface) {
   }
 }
 
-async function findUSBPrinter(options = {}) {
-  const { excludeVendorId } = options;
-  const devices = await usb.getDevices();
-  for (const d of devices) {
-    try {
-      if (excludeVendorId && d.vendorId === excludeVendorId) continue;
-      const cfgs = d.configurations;
-      if (!cfgs || cfgs.length === 0) continue;
-      for (const cfg of cfgs) {
-        for (let i = 0; i < cfg.interfaces.length; i++) {
-          const iface = cfg.interfaces[i];
-          if (!isPrinterInterface(iface)) continue;
-          const ep = findBulkOutEndpoint(iface);
-          if (ep !== null) {
-            return { device: d, interfaceNum: i, endpoint: ep };
-          }
-        }
-      }
-    } catch (_) {}
-  }
-  return null;
-}
-
-async function doUSBPrint(dataBuffer) {
-  const result = await findUSBPrinter({ excludeVendorId: ZEBRA_VENDOR_ID });
-  if (!result) {
-    console.error("doUSBPrint: No USB printer found (excluding Zebra)");
-    throw new Error("No USB printer found. Check connection and power.");
-  }
-  const { device, interfaceNum, endpoint } = result;
-  const printerName = safeProductName(device);
-  console.log(
-    `doUSBPrint: Found device "${printerName}" interface=${interfaceNum} endpoint=${endpoint} bufferSize=${dataBuffer.length}`,
-  );
-
-  await device.open();
-  console.log("doUSBPrint: device opened");
-  try {
-    await device.detachKernelDriver(interfaceNum);
-    console.log("doUSBPrint: detachKernelDriver OK");
-  } catch (_) {
-    console.log("doUSBPrint: detachKernelDriver skipped");
-  }
-  await device.claimInterface(interfaceNum);
-  console.log("doUSBPrint: interface claimed");
-  try {
-    const writeResult = await device.transferOut(endpoint, dataBuffer);
-    console.log("doUSBPrint: transferOut status:", writeResult.status);
-    if (writeResult.status !== "ok") {
-      throw new Error("USB write failed: " + writeResult.status);
-    }
-  } finally {
-    try {
-      await device.releaseInterface(interfaceNum);
-      console.log("doUSBPrint: interface released");
-    } catch (_) {
-      console.log("doUSBPrint: releaseInterface skipped");
-    }
-    try {
-      device.close();
-      console.log("doUSBPrint: device closed");
-    } catch (_) {
-      console.log("doUSBPrint: close skipped");
-    }
-  }
-}
-
 const ZEBRA_VENDOR_ID = 0x0a5f;
 
 async function findZebraPrinter() {
@@ -886,10 +822,6 @@ function writeTempFile(content, ext) {
 function doPrintJob(data, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
 
-  if (paperSize === "thermal") {
-    return doUSBPrint(data);
-  }
-
   return new Promise((resolve, reject) => {
     const filePath = writeTempFile(data, "html");
 
@@ -961,11 +893,6 @@ function printReceipt(sale, printerConfig) {
   console.log(
     `printReceipt: paperSize=${paperSize} items=${(sale.items || []).length} total=${sale.total}`,
   );
-  if (paperSize === "thermal") {
-    const data = generateESCPOSReceipt(sale);
-    console.log(`printReceipt: generated ESC/POS data length=${data.length}`);
-    return doPrintJob(data, printerConfig);
-  }
   const html = generateHTML(sale, paperSize);
   console.log(`printReceipt: generated HTML length=${html.length}`);
   return doPrintJob(html, printerConfig);
@@ -973,10 +900,6 @@ function printReceipt(sale, printerConfig) {
 
 function printReturnReceipt(returnData, sale, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
-  if (paperSize === "thermal") {
-    const data = generateESCPOSReturnReceipt(returnData, sale);
-    return doPrintJob(data, printerConfig);
-  }
   const html = generateReturnReceiptHTML(returnData, sale, paperSize);
   return doPrintJob(html, printerConfig);
 }
