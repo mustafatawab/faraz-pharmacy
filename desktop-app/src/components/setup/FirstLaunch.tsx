@@ -16,21 +16,32 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState("");
   const [checkSuccess, setCheckSuccess] = useState(false);
+  const [serverLoading, setServerLoading] = useState(false);
 
   async function save(cfg: { mode: string; serverUrl?: string }) {
     setSaving(true);
-    await window.saveConfig(cfg);
-    setSaving(false);
-    onComplete();
+    try {
+      await window.saveConfig(cfg);
+      onComplete();
+    } catch (err) {
+      console.error("Failed to save config:", err);
+      setCheckError(err instanceof Error ? err.message : "Failed to save configuration");
+      setSaving(false);
+    }
   }
 
   async function handleChooseServer() {
+    setServerLoading(true);
+    setCheckError("");
     try {
       const ip = await window.getServerIp();
       setMyIp(ip);
       setStep("server-ip");
-    } catch {
-      save({ mode: "server" });
+    } catch (err) {
+      console.error("Failed to get server IP:", err);
+      await save({ mode: "server" });
+    } finally {
+      setServerLoading(false);
     }
   }
 
@@ -101,16 +112,27 @@ export default function FirstLaunch({ onComplete }: FirstLaunchProps) {
 
         {step === "choose" ? (
           <div className="space-y-3">
+            {checkError && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-danger/5 border border-danger/20 text-sm text-danger">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{checkError}</span>
+              </div>
+            )}
             <button
               onClick={handleChooseServer}
-              className="w-full text-left p-5 rounded-xl border-2 border-border hover:border-accent/40 hover:bg-accent/5 transition-all group"
+              disabled={serverLoading}
+              className="w-full text-left p-5 rounded-xl border-2 border-border hover:border-accent/40 hover:bg-accent/5 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-start gap-4">
                 <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 group-hover:bg-accent/20 transition-colors">
-                  <Server className="h-5 w-5 text-accent" />
+                  {serverLoading ? (
+                    <Loader2 className="h-5 w-5 text-accent animate-spin" />
+                  ) : (
+                    <Server className="h-5 w-5 text-accent" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-text-primary">Server Machine</h3>
+                  <h3 className="font-semibold text-text-primary">{serverLoading ? "Detecting IP..." : "Server Machine"}</h3>
                   <p className="text-sm text-text-secondary mt-1">
                     Stores the database and shares it over your local network.
                     Other machines will connect to this one.

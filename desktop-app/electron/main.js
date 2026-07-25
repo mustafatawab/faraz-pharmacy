@@ -1,8 +1,12 @@
-const { app, BrowserWindow } = require("electron");
-const path = require("path");
-const { registerHandlers } = require("./ipc-handlers");
+import { app, BrowserWindow } from "electron";
+import path from "path";
+import { fileURLToPath } from "url";
+import { registerHandlers } from "./ipc-handlers.js";
 
-const isDev = process.env.NODE_ENV === "development" || process.argv.includes("--dev");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const isDev =
+  process.env.NODE_ENV === "development" || process.argv.includes("--dev") || !app.isPackaged;
 
 function createWindow() {
   const win = new BrowserWindow({

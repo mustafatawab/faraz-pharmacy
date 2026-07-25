@@ -1,6 +1,6 @@
-const path = require("path");
-const os = require("os");
-const fs = require("fs");
+import fs from "fs";
+import path from "path";
+import os from "os";  
 
 const DATA_DIR = path.join(os.homedir(), ".faraz-pharmacy");
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
@@ -32,4 +32,5 @@ function isConfigured() {
   return loadConfig().mode !== null;
 }
 
-module.exports = { loadConfig, saveConfig, isConfigured, getBackupsDir };
+
+export { loadConfig , saveConfig, isConfigured , getBackupsDir}

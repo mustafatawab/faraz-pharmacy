@@ -1,384 +1,173 @@
-const { BrowserWindow, app } = require("electron");
-const path = require("path");
-const fs = require("fs");
-const { usb } = require("usb");
+import { BrowserWindow, app } from "electron";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import { usb } from "usb";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const logoPath = `file://${path.join(__dirname, "image", "logo.png").replace(/\\/g, "/")}`;
 
 function generateSaleReceiptHTML(sale) {
-
   const items = sale.items || [];
-
   const now = new Date();
-
   const dateStr = now.toLocaleDateString("en-PK", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
   });
-
   const totalAmount = sale.total || 0;
   const paid = sale.amount_paid || 0;
   const balance = Math.max(0, totalAmount - paid);
-  const arrears = sale.arrears || 0;
+  const changeDue = sale.change || 0;
+  const discount = sale.discount || 0;
+
+  const itemsHTML = items
+    .map((item) => {
+      const unitPrice = item.unit_price || item.subtotal / item.quantity;
+      return `
+      <tr>
+        <td>${item.product_name}</td>
+        <td class="r">${item.quantity}</td>
+        <td class="r">${Math.round(unitPrice)}</td>
+        <td class="r b">${Math.round(item.subtotal)}</td>
+      </tr>`;
+    })
+    .join("");
 
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-@page { size: 80mm auto; margin: 10;
-  text-align:center; }
-
-*, *::before, *::after { box-sizing: border-box; }
-
+@page { size: 80mm auto; margin: 0; }
 body {
   width: 80mm;
-  margin: 0 auto;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, "Lucida Console", monospace;;
+  font-size: 16px;
+  margin: 0;
+  padding: 5mm;
   color: #000;
-  padding: 4mm 3mm;
-  line-height: 1.3;
 }
-
 .center { text-align: center; }
-
-.store-name {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  margin-bottom: 2px;
-}
-
-.store-info {
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.divider { border-top: 1px dashed #000; margin: 6px 0; }
-
-.info-row {
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-
-.item-table th {
+.b { font-weight: 700; }
+.header { font-weight: bold; font-size: 16px;}
+.sub { font-size: 12px; color: #333; margin: 2px 0; }
+.divider { border-top: 1px dashed #888; margin: 6px 0; }
+.thick { border-top: 2px solid #000; margin: 6px 0; }
+table { width: 100%; border-collapse: collapse; }
+th {
   border-bottom: 1px solid #000;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 0 2px;
   text-align: left;
-}
-
-.item-table th:nth-child(1) { width: 40%; }
-.item-table th:nth-child(2) { width: 12%; text-align: center; }
-.item-table th:nth-child(3) { width: 22%; text-align: right; }
-.item-table th:nth-child(4) { width: 26%; text-align: right; }
-
-.item-table td {
-  padding: 2px 0;
   font-size: 11px;
-  font-weight: 600;
-  overflow: hidden;
-  word-wrap: break-word;
-  white-space: nowrap;
-}
-
-.item-table td:nth-child(1) { overflow: hidden; text-overflow: ellipsis; }
-.item-table td:nth-child(2) { text-align: center; }
-.item-table td:nth-child(3) { text-align: right; }
-.item-table td:nth-child(4) { text-align: right; }
-
-.text-right { text-align: right; }
-
-.summary-table td {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 0;
-}
-
-.total-box td {
-  font-weight: 800;
-  font-size: 14px;
   padding: 4px 0;
-  border-top: 2px solid #000;
-  border-bottom: 2px solid #000;
+  letter-spacing: 1px;
 }
+td { padding: 2px 0; font-size: 12px; }
+.r { text-align: right; }
+.lines td { padding: 3px 0; }
 
-.urdu {
-  direction: rtl;
-  font-family: Arial, sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.6;
-}
-
-.footer-text {
-  font-size: 10px;
-  font-weight: 600;
+.urdu{
+ display: flex;
+ flex-direction: columns;
+ align-items: center;
+ justify-content: center;
 }
 </style>
 </head>
-
 <body>
 
 <div class="center">
-  <div class="store-name">FARAZ PHARMACY</div>
-  <div class="store-info">Near Civil Hospital Barikot, Swat</div>
-  <div class="store-info">Phone: 03469383792 / 03449006940</div>
+  <div class="header">FARAZ MEDICAL STORE</div>
+  <div class="sub">Beside Noman Clinical Laboratory, Barikot</div>
+  <div class="sub">Phone: 03469383792 / 03449006940</div>
 </div>
 
 <div class="divider"></div>
 
-<div class="info-row">Invoice #: ${sale.id ? sale.id.slice(0, 8) : Math.floor(Math.random() * 100000)}</div>
-<div class="info-row">Date: ${dateStr}</div>
-<div class="info-row">Customer: ${sale.customer_name || "Walk-in Customer"}</div>
-<div class="info-row">Items: ${items.length}</div>
+<div style="font-size:11px;">
+  <div>Date: ${dateStr}</div>
+  <div>Invoice #: ${sale.id || ""}</div>
+  <div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
+</div>
 
 <div class="divider"></div>
 
-<table class="item-table">
+<div style="font-size:11px; margin-bottom:4px;">No. of Items: ${items.length}</div>
+
+<table>
   <thead>
     <tr>
       <th>Product</th>
-      <th>Qty</th>
-      <th>Price</th>
-      <th>Amount</th>
+      <th class="r">Qty</th>
+      <th class="r">Price</th>
+      <th class="r">Amount</th>
     </tr>
   </thead>
-  <tbody>
-    ${items.map(item => `
-      <tr>
-        <td>${item.product_name}</td>
-        <td>${item.quantity}</td>
-        <td>${(item.unit_price || 0).toFixed(0)}</td>
-        <td>${item.subtotal.toFixed(0)}</td>
-      </tr>
-    `).join("")}
-  </tbody>
+  <tbody>${itemsHTML}</tbody>
 </table>
 
 <div class="divider"></div>
 
-<table class="summary-table">
-  <tr>
-    <td>Subtotal</td>
-    <td class="text-right">${sale.subtotal.toFixed(0)}</td>
-  </tr>
-  ${sale.discount > 0 ? `
-  <tr>
-    <td>Discount</td>
-    <td class="text-right">-${sale.discount.toFixed(0)}</td>
-  </tr>` : ""}
-  <tr class="total-box">
-    <td>TOTAL</td>
-    <td class="text-right">${totalAmount.toFixed(0)}</td>
-  </tr>
-  <tr>
-    <td>Paid</td>
-    <td class="text-right">${paid.toFixed(0)}</td>
-  </tr>
-  <tr>
-    <td>Balance</td>
-    <td class="text-right">${balance.toFixed(0)}</td>
-  </tr>
-  <tr>
-    <td>Arrears</td>
-    <td class="text-right">${arrears.toFixed(0)}</td>
-  </tr>
+<table class="lines">
+  <tr><td style="width:70%">Total Amount</td><td class="r">${Math.round(totalAmount)}</td></tr>
+  ${discount > 0 ? `<tr><td>Discount</td><td class="r">-${Math.round(discount)}</td></tr>` : ""}
+  <tr><td>GST (0%)</td><td class="r">0</td></tr>
+</table>
+
+<div class="thick"></div>
+
+<table class="lines">
+  <tr><td style="width:70%" class="b">Total Payable</td><td class="r b">${Math.round(totalAmount)}</td></tr>
+  <tr><td>Amount Paid</td><td class="r">${Math.round(paid)}</td></tr>
+  ${
+    balance > 0
+      ? `<tr><td>Balance</td><td class="r">${Math.round(balance)}</td></tr>`
+      : changeDue > 0
+        ? `<tr><td>Change</td><td class="r">${Math.round(changeDue)}</td></tr>`
+        : ""
+  }
 </table>
 
 <div class="divider"></div>
 
-<table>
-  <tr>
-    <td class="urdu">
-      <b>ضروری نوٹ</b><br>
-      - رسید کے بغیر کوئی واپسی نہیں<br>
-      - دوائیوں کی واپسی ممکن نہیں<br>
-      - 3 دن بعد کوئی واپسی نہیں
-    </td>
-  </tr>
-</table>
+<div style="text-align:center;">
+  <div class="urdu">
+   <span>
+    No return without receipt
+    </span>
+    <span>
+    No return of freezer/refrigerator medicines
+    </span>
 
-<div class="divider"></div>
-
-<div class="center footer-text">
-  <b>
-    ${sale.status === "partial"
-      ? "PARTIAL PAYMENT"
-      : "PAYMENT RECEIVED"
-    }
-  </b>
+    <span>
+    No return after 3 days
+    </span>
+  </div>
 </div>
 
 <div class="divider"></div>
 
-<div class="center footer-text">
-  THANK YOU FOR YOUR VISIT<br>
-  Get Well Soon ❤️<br><br>
-  Powered by Faraz Pharmacy POS
+<div class="center" style="font-size:10px; color:#555;">
+  THANK YOU FOR YOUR VISIT
 </div>
 
 </body>
 </html>`;
 }
 
-// function generateSaleReceiptHTML(sale) {
-
-//   const items = sale.items || [];
-//   const now = new Date();
-//   const dateStr = now.toLocaleDateString("en-PK", {
-//     day: "2-digit", month: "2-digit", year: "numeric",
-//     hour: "2-digit", minute: "2-digit"
-//   });
-//   const totalAmount = sale.total || 0;
-//   const paid = sale.amount_paid || 0;
-//   const balance = Math.max(0, totalAmount - paid);
-//   const changeDue = sale.change || 0;
-//   const discount = sale.discount || 0;
-
-//   const itemsHTML = items.map(item => {
-//     const unitPrice = item.unit_price || (item.subtotal / item.quantity);
-//     return `
-//       <tr>
-//         <td>${item.product_name}</td>
-//         <td class="r">${item.quantity}</td>
-//         <td class="r">${Math.round(unitPrice)}</td>
-//         <td class="r b">${Math.round(item.subtotal)}</td>
-//       </tr>`;
-//   }).join("");
-
-//   return `<!DOCTYPE html>
-// <html>
-// <head>
-// <meta charset="utf-8">
-// <style>
-// @page { size: 80mm auto; margin: 0; }
-// body {
-//   width: 80mm;
-//   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, "Lucida Console", monospace;;
-//   font-size: 16px;
-//   margin: 0;
-//   padding: 5mm;
-//   color: #000;
-// }
-// .center { text-align: center; }
-// .b { font-weight: 700; }
-// .header { font-weight: bold; font-size: 16px;}
-// .sub { font-size: 12px; color: #333; margin: 2px 0; }
-// .divider { border-top: 1px dashed #888; margin: 6px 0; }
-// .thick { border-top: 2px solid #000; margin: 6px 0; }
-// table { width: 100%; border-collapse: collapse; }
-// th {
-//   border-bottom: 1px solid #000;
-//   text-align: left;
-//   font-size: 11px;
-//   padding: 4px 0;
-//   letter-spacing: 1px;
-// }
-// td { padding: 2px 0; font-size: 12px; }
-// .r { text-align: right; }
-// .lines td { padding: 3px 0; }
-
-// .urdu{
-//  display: flex;
-//  flex-direction: columns;
-//  align-items: center;
-//  justify-content: center;
-// }
-// </style>
-// </head>
-// <body>
-
-// <div class="center">
-//   <div class="header">FARAZ MEDICAL STORE</div>
-//   <div class="sub">Beside Noman Clinical Laboratory, Barikot</div>
-//   <div class="sub">Phone: 03469383792 / 03449006940</div>
-// </div>
-
-// <div class="divider"></div>
-
-// <div style="font-size:11px;">
-//   <div>Date: ${dateStr}</div>
-//   <div>Invoice #: ${sale.id || ""}</div>
-//   <div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
-// </div>
-
-// <div class="divider"></div>
-
-// <div style="font-size:11px; margin-bottom:4px;">No. of Items: ${items.length}</div>
-
-// <table>
-//   <thead>
-//     <tr>
-//       <th>Product</th>
-//       <th class="r">Qty</th>
-//       <th class="r">Price</th>
-//       <th class="r">Amount</th>
-//     </tr>
-//   </thead>
-//   <tbody>${itemsHTML}</tbody>
-// </table>
-
-// <div class="divider"></div>
-
-// <table class="lines">
-//   <tr><td style="width:70%">Total Amount</td><td class="r">${Math.round(totalAmount)}</td></tr>
-//   ${discount > 0 ? `<tr><td>Discount</td><td class="r">-${Math.round(discount)}</td></tr>` : ""}
-//   <tr><td>GST (0%)</td><td class="r">0</td></tr>
-// </table>
-
-// <div class="thick"></div>
-
-// <table class="lines">
-//   <tr><td style="width:70%" class="b">Total Payable</td><td class="r b">${Math.round(totalAmount)}</td></tr>
-//   <tr><td>Amount Paid</td><td class="r">${Math.round(paid)}</td></tr>
-//   ${balance > 0
-//     ? `<tr><td>Balance</td><td class="r">${Math.round(balance)}</td></tr>`
-//     : changeDue > 0
-//       ? `<tr><td>Change</td><td class="r">${Math.round(changeDue)}</td></tr>`
-//       : ""}
-// </table>
-
-// <div class="divider"></div>
-
-// <div style="text-align:center;">
-//   <div class="urdu">
-//    <span>
-//     No return without receipt
-//     </span>
-//     <span>
-//     No return of freezer/refrigerator medicines
-//     </span>
-
-//     <span>
-//     No return after 3 days
-//     </span>
-//   </div>
-// </div>
-
-// <div class="divider"></div>
-
-// <div class="center" style="font-size:10px; color:#555;">
-//   THANK YOU FOR YOUR VISIT
-// </div>
-
-// </body>
-// </html>`;
-// }
-
-
 function generateA4InvoiceHTML(sale) {
   const items = sale.items || [];
   const now = new Date();
-  const dateStr = now.toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString("en-PK", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -412,7 +201,7 @@ td:nth-child(2) { text-align: center; }
 </div>
 <table>
 <thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead>
-<tbody>${items.map(i => `<tr><td>${i.product_name}</td><td style="text-align:center">${i.quantity}</td><td style="text-align:right">${(i.subtotal / i.quantity).toFixed(0)}</td><td style="text-align:right">${i.subtotal.toFixed(0)}</td></tr>`).join("")}</tbody>
+<tbody>${items.map((i) => `<tr><td>${i.product_name}</td><td style="text-align:center">${i.quantity}</td><td style="text-align:right">${(i.subtotal / i.quantity).toFixed(0)}</td><td style="text-align:right">${i.subtotal.toFixed(0)}</td></tr>`).join("")}</tbody>
 </table>
 <table class="totals">
 <tr><td>Subtotal</td><td style="text-align:right">${sale.subtotal.toFixed(0)}</td></tr>
@@ -485,7 +274,7 @@ function generateA5InvoiceHTML(sale) {
     month: "short",
     year: "numeric",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
   });
 
   return `
@@ -767,7 +556,7 @@ body{
       <h2>INVOICE</h2>
 
       <div class="invoice-no">
-        #${sale.id ? sale.id.slice(0,8) : "000000"}
+        #${sale.id ? sale.id.slice(0, 8) : "000000"}
       </div>
     </div>
 
@@ -807,13 +596,17 @@ body{
 
     <tbody>
 
-      ${items.map(item => `
+      ${items
+        .map(
+          (item) => `
       <tr>
         <td>${item.product_name}</td>
         <td class="text-center">${item.quantity}</td>
         <td class="text-right">Rs ${item.subtotal.toFixed(0)}</td>
       </tr>
-      `).join("")}
+      `,
+        )
+        .join("")}
 
     </tbody>
 
@@ -847,12 +640,16 @@ body{
           <td>Rs ${sale.subtotal.toFixed(0)}</td>
         </tr>
 
-        ${sale.discount > 0 ? `
+        ${
+          sale.discount > 0
+            ? `
         <tr>
           <td>Discount</td>
           <td>- Rs ${sale.discount.toFixed(0)}</td>
         </tr>
-        ` : ""}
+        `
+            : ""
+        }
 
         <tr class="grand-total">
           <td>Total</td>
@@ -866,10 +663,7 @@ body{
 
         <tr>
           <td>Change</td>
-          <td>Rs ${Math.max(
-            0,
-            sale.amount_paid - sale.total
-          ).toFixed(0)}</td>
+          <td>Rs ${Math.max(0, sale.amount_paid - sale.total).toFixed(0)}</td>
         </tr>
 
         <tr>
@@ -881,8 +675,8 @@ body{
 
       ${
         sale.status === "partial"
-        ? `<div class="status partial">PARTIAL PAYMENT</div>`
-        : `<div class="status">PAID</div>`
+          ? `<div class="status partial">PARTIAL PAYMENT</div>`
+          : `<div class="status">PAID</div>`
       }
 
     </div>
@@ -917,7 +711,13 @@ body{
 function generateReturnReceiptHTML(returnData, sale, paperSize) {
   const items = returnData.items || [];
   const now = new Date();
-  const dateStr = now.toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString("en-PK", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   const isThermal = paperSize === "thermal";
   const pageCSS = isThermal
@@ -928,11 +728,13 @@ function generateReturnReceiptHTML(returnData, sale, paperSize) {
     ? `body { font-family: 'Courier New', monospace; font-size: 12px; color: #000; padding: 4mm 3mm; line-height: 1.3; } .receipt { width: 100%; }`
     : `body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #000; }`;
 
-  const itemsHTML = items.map(i => {
-    const reasonStr = i.reason ? ` (${i.reason})` : "";
-    const amt = i.refund_amount ?? i.subtotal ?? 0;
-    return `<tr><td>${i.product_name} × ${i.quantity}${reasonStr}</td><td style="text-align:right">${amt.toFixed(0)}</td></tr>`;
-  }).join("");
+  const itemsHTML = items
+    .map((i) => {
+      const reasonStr = i.reason ? ` (${i.reason})` : "";
+      const amt = i.refund_amount ?? i.subtotal ?? 0;
+      return `<tr><td>${i.product_name} × ${i.quantity}${reasonStr}</td><td style="text-align:right">${amt.toFixed(0)}</td></tr>`;
+    })
+    .join("");
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -1020,19 +822,19 @@ function getPrintOptions(printerConfig) {
 }
 
 function escposInit() {
-  return Buffer.from([0x1B, 0x40]);
+  return Buffer.from([0x1b, 0x40]);
 }
 
 function escposAlign(n) {
-  return Buffer.from([0x1B, 0x61, n]);
+  return Buffer.from([0x1b, 0x61, n]);
 }
 
 function escposBold(n) {
-  return Buffer.from([0x1B, 0x45, n]);
+  return Buffer.from([0x1b, 0x45, n]);
 }
 
 function escposCut(full) {
-  return Buffer.from([0x1D, 0x56, full ? 0x00 : 0x01]);
+  return Buffer.from([0x1d, 0x56, full ? 0x00 : 0x01]);
 }
 
 function escposText(str) {
@@ -1044,15 +846,15 @@ function escposTextUTF8(str) {
 }
 
 function escposCodePage(n) {
-  return Buffer.from([0x1B, 0x74, n]);
+  return Buffer.from([0x1b, 0x74, n]);
 }
 
 function escposFont(n) {
-  return Buffer.from([0x1B, 0x4D, n]);
+  return Buffer.from([0x1b, 0x4d, n]);
 }
 
 function escposCharSize(h, w) {
-  return Buffer.from([0x1D, 0x21, (h << 4) | w]);
+  return Buffer.from([0x1d, 0x21, (h << 4) | w]);
 }
 
 function escposLine(char, len) {
@@ -1087,30 +889,39 @@ function generateESCPOSReceipt(sale) {
   parts.push(escposAlign(0));
 
   const dateStr = now.toLocaleDateString("en-PK", {
-    day: "numeric", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
   parts.push(escposText("Date: " + dateStr));
   parts.push(escposText("Invoice #: " + (sale.id || "")));
-  parts.push(escposText("Customer: " + (sale.customer_name || "Walk-in Customer")));
+  parts.push(
+    escposText("Customer: " + (sale.customer_name || "Walk-in Customer")),
+  );
   parts.push(escposLine("-", L));
 
   const colName = 28;
   const colQty = 6;
   const colUnit = 8;
   const colAmt = 10;
-  parts.push(escposText(
-    "Item".padEnd(colName) +
-    "Qty".padStart(colQty) +
-    "Price".padStart(colUnit) +
-    "Amount".padStart(colAmt)
-  ));
+  parts.push(
+    escposText(
+      "Item".padEnd(colName) +
+        "Qty".padStart(colQty) +
+        "Price".padStart(colUnit) +
+        "Amount".padStart(colAmt),
+    ),
+  );
   parts.push(escposLine("-", L));
 
-  items.forEach(item => {
+  items.forEach((item) => {
     const name = (item.product_name || "").padEnd(colName).slice(0, colName);
     const qty = String(item.quantity).padStart(colQty);
-    const unitPrice = String(Math.round(item.subtotal / item.quantity)).padStart(colUnit);
+    const unitPrice = String(
+      Math.round(item.subtotal / item.quantity),
+    ).padStart(colUnit);
     const amount = String(item.subtotal.toFixed(0)).padStart(colAmt);
     parts.push(escposText(name + qty + unitPrice + amount));
   });
@@ -1118,7 +929,10 @@ function generateESCPOSReceipt(sale) {
   parts.push(escposLine("-", L));
 
   function addLine(label, valueStr, isBold) {
-    const line = label.padEnd(colName) + "".padStart(colQty + colUnit) + valueStr.padStart(colAmt);
+    const line =
+      label.padEnd(colName) +
+      "".padStart(colQty + colUnit) +
+      valueStr.padStart(colAmt);
     if (isBold) parts.push(escposBold(1));
     parts.push(escposText(line));
     if (isBold) parts.push(escposBold(0));
@@ -1160,8 +974,11 @@ function generateESCPOSReturnReceipt(returnData, sale) {
   const items = returnData.items || [];
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-PK", {
-    day: "numeric", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit"
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
   const L = 56;
   const parts = [];
@@ -1184,16 +1001,19 @@ function generateESCPOSReturnReceipt(returnData, sale) {
   parts.push(escposAlign(0));
   const colName = 44;
   const colAmt = 12;
-  parts.push(escposText(
-    "Item description".padEnd(colName) +
-    "Refund".padStart(colAmt)
-  ));
+  parts.push(
+    escposText("Item description".padEnd(colName) + "Refund".padStart(colAmt)),
+  );
   parts.push(escposLine("-", L));
 
-  items.forEach(i => {
+  items.forEach((i) => {
     const reasonStr = i.reason ? " (" + i.reason + ")" : "";
-    const name = (i.product_name + " x" + i.quantity + reasonStr).padEnd(colName).slice(0, colName);
-    const amt = String((i.refund_amount ?? i.subtotal ?? 0).toFixed(0)).padStart(colAmt);
+    const name = (i.product_name + " x" + i.quantity + reasonStr)
+      .padEnd(colName)
+      .slice(0, colName);
+    const amt = String(
+      (i.refund_amount ?? i.subtotal ?? 0).toFixed(0),
+    ).padStart(colAmt);
     parts.push(escposText(name + amt));
   });
 
@@ -1234,7 +1054,10 @@ async function findUSBPrinter(interfaceClass, excludeVendorId) {
       if (!configs || configs.length === 0) continue;
       for (const cfg of configs) {
         for (const iface of cfg.interfaces) {
-          if (iface.alternate && iface.alternate.interfaceClass === (interfaceClass || 7)) {
+          if (
+            iface.alternate &&
+            iface.alternate.interfaceClass === (interfaceClass || 7)
+          ) {
             const endpoint = findUSBEndpoint(iface);
             if (endpoint) return { device: d, endpoint };
           }
@@ -1252,11 +1075,18 @@ async function doUSBPrint(dataBuffer) {
     throw new Error("No USB printer found. Check connection and power.");
   }
   const { device, endpoint } = result;
-  console.log(`doUSBPrint: Found device "${device.productName}" endpoint=${endpoint} bufferSize=${dataBuffer.length}`);
+  console.log(
+    `doUSBPrint: Found device "${device.productName}" endpoint=${endpoint} bufferSize=${dataBuffer.length}`,
+  );
 
   await device.open();
   console.log("doUSBPrint: device opened");
-  try { await device.detachKernelDriver(0); console.log("doUSBPrint: detachKernelDriver OK"); } catch (_) { console.log("doUSBPrint: detachKernelDriver skipped"); }
+  try {
+    await device.detachKernelDriver(0);
+    console.log("doUSBPrint: detachKernelDriver OK");
+  } catch (_) {
+    console.log("doUSBPrint: detachKernelDriver skipped");
+  }
   await device.claimInterface(0);
   console.log("doUSBPrint: interface claimed");
   try {
@@ -1266,12 +1096,22 @@ async function doUSBPrint(dataBuffer) {
       throw new Error("USB write failed: " + writeResult.status);
     }
   } finally {
-    try { await device.releaseInterface(0); console.log("doUSBPrint: interface released"); } catch (_) { console.log("doUSBPrint: releaseInterface skipped"); }
-    try { device.close(); console.log("doUSBPrint: device closed"); } catch (_) { console.log("doUSBPrint: close skipped"); }
+    try {
+      await device.releaseInterface(0);
+      console.log("doUSBPrint: interface released");
+    } catch (_) {
+      console.log("doUSBPrint: releaseInterface skipped");
+    }
+    try {
+      device.close();
+      console.log("doUSBPrint: device closed");
+    } catch (_) {
+      console.log("doUSBPrint: close skipped");
+    }
   }
 }
 
-const ZEBRA_VENDOR_ID = 0x0A5F;
+const ZEBRA_VENDOR_ID = 0x0a5f;
 
 async function findZebraPrinter() {
   const devices = await usb.getDevices();
@@ -1298,7 +1138,9 @@ async function doUSBZPLPrint(dataBuffer) {
     throw new Error("No Zebra printer found. Check connection and power.");
   }
   await device.open();
-  try { await device.detachKernelDriver(0); } catch (_) {}
+  try {
+    await device.detachKernelDriver(0);
+  } catch (_) {}
   await device.claimInterface(0);
   try {
     const result = await device.transferOut(1, dataBuffer);
@@ -1306,8 +1148,12 @@ async function doUSBZPLPrint(dataBuffer) {
       throw new Error("Zebra USB write failed: " + result.status);
     }
   } finally {
-    try { await device.releaseInterface(0); } catch (_) {}
-    try { device.close(); } catch (_) {}
+    try {
+      await device.releaseInterface(0);
+    } catch (_) {}
+    try {
+      device.close();
+    } catch (_) {}
   }
 }
 
@@ -1330,7 +1176,12 @@ function generateZPLBarcode(barcode, copies, labelWidth, labelHeight) {
 }
 
 async function printBarcodeLabel(barcode, copies, labelWidth, labelHeight) {
-  const data = generateZPLBarcode(barcode, copies || 1, labelWidth, labelHeight);
+  const data = generateZPLBarcode(
+    barcode,
+    copies || 1,
+    labelWidth,
+    labelHeight,
+  );
   await doUSBZPLPrint(data);
 }
 
@@ -1347,11 +1198,15 @@ function writeTempFile(content, ext) {
   return filePath;
 }
 
-function doPrintJob(htmlContent, printerConfig) {
+function doPrintJob(data, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
 
+  if (paperSize === "thermal") {
+    return doUSBPrint(data);
+  }
+
   return new Promise((resolve, reject) => {
-    const filePath = writeTempFile(htmlContent, "html");
+    const filePath = writeTempFile(data, "html");
 
     const printWin = new BrowserWindow({
       width: paperSize === "a4" ? 800 : paperSize === "thermal" ? 350 : 600,
@@ -1369,34 +1224,20 @@ function doPrintJob(htmlContent, printerConfig) {
 
     function cleanup() {
       resolved = true;
-      try { printWin.close(); } catch (_) {}
-      try { fs.unlinkSync(filePath); } catch (_) {}
+      try {
+        printWin.close();
+      } catch (_) {}
+      try {
+        fs.unlinkSync(filePath);
+      } catch (_) {}
     }
 
     function doPrint() {
       if (resolved) return;
-      printWin.webContents.executeJavaScript("document.body.scrollHeight").then(() => {
-        setTimeout(() => {
-          if (resolved) return;
-          try {
-            printWin.webContents.print(getPrintOptions(printerConfig), (success) => {
-              if (resolved) return;
-              if (!success) {
-                cleanup();
-                return reject(new Error("Print failed or cancelled"));
-              }
-              cleanup();
-              resolve();
-            });
-          } catch (e) {
-            cleanup();
-            reject(e);
-          }
-        }, 300);
-      }).catch(() => {
-        if (resolved) return;
-        try {
-          printWin.webContents.print(getPrintOptions(printerConfig), (success) => {
+      try {
+        printWin.webContents.print(
+          getPrintOptions(printerConfig),
+          (success) => {
             if (resolved) return;
             if (!success) {
               cleanup();
@@ -1404,12 +1245,12 @@ function doPrintJob(htmlContent, printerConfig) {
             }
             cleanup();
             resolve();
-          });
-        } catch (e) {
-          cleanup();
-          reject(e);
-        }
-      });
+          },
+        );
+      } catch (e) {
+        cleanup();
+        reject(e);
+      }
     }
 
     printWin.webContents.on("did-finish-load", doPrint);
@@ -1432,7 +1273,14 @@ function doPrintJob(htmlContent, printerConfig) {
 
 function printReceipt(sale, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
-  console.log(`printReceipt: paperSize=${paperSize} items=${(sale.items || []).length} total=${sale.total}`);
+  console.log(
+    `printReceipt: paperSize=${paperSize} items=${(sale.items || []).length} total=${sale.total}`,
+  );
+  if (paperSize === "thermal") {
+    const data = generateESCPOSReceipt(sale);
+    console.log(`printReceipt: generated ESC/POS data length=${data.length}`);
+    return doPrintJob(data, printerConfig);
+  }
   const html = generateHTML(sale, paperSize);
   console.log(`printReceipt: generated HTML length=${html.length}`);
   return doPrintJob(html, printerConfig);
@@ -1440,6 +1288,10 @@ function printReceipt(sale, printerConfig) {
 
 function printReturnReceipt(returnData, sale, printerConfig) {
   const paperSize = printerConfig?.paperSize || "thermal";
+  if (paperSize === "thermal") {
+    const data = generateESCPOSReturnReceipt(returnData, sale);
+    return doPrintJob(data, printerConfig);
+  }
   const html = generateReturnReceiptHTML(returnData, sale, paperSize);
   return doPrintJob(html, printerConfig);
 }
@@ -1473,4 +1325,4 @@ async function listUSBPrinters() {
   return printers;
 }
 
-module.exports = { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters, generateHTML, generateReturnReceiptHTML };
+export { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters };

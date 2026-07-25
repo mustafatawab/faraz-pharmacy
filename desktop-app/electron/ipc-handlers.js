@@ -1,9 +1,15 @@
-const { ipcMain, dialog, BrowserWindow } = require("electron");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const { loadConfig, saveConfig, getBackupsDir } = require("./config");
-const { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters, generateHTML, generateReturnReceiptHTML } = require("./printer");
+import { ipcMain, dialog, BrowserWindow } from "electron";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import { loadConfig, saveConfig, getBackupsDir } from "./config.js";
+
+import {
+  printReceipt,
+  printReturnReceipt,
+  printBarcodeLabel,
+  listUSBPrinters,
+} from "./printer.js";
 
 function getLocalIp() {
   const ifaces = os.networkInterfaces();
@@ -90,23 +96,29 @@ function registerHandlers() {
     }
   });
 
-  ipcMain.handle("print:return-receipt", async (_, returnData, sale, printerConfig) => {
-    try {
-      await printReturnReceipt(returnData, sale, printerConfig);
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
+  ipcMain.handle(
+    "print:return-receipt",
+    async (_, returnData, sale, printerConfig) => {
+      try {
+        await printReturnReceipt(returnData, sale, printerConfig);
+        return { success: true };
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    },
+  );
 
-  ipcMain.handle("print:barcode-label", async (_, barcode, copies, labelWidth, labelHeight) => {
-    try {
-      await printBarcodeLabel(barcode, copies, labelWidth, labelHeight);
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
+  ipcMain.handle(
+    "print:barcode-label",
+    async (_, barcode, copies, labelWidth, labelHeight) => {
+      try {
+        await printBarcodeLabel(barcode, copies, labelWidth, labelHeight);
+        return { success: true };
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    },
+  );
 
   ipcMain.handle("print:generate-receipt-html", (_, sale, paperSize) => {
     try {
@@ -133,12 +145,21 @@ function registerHandlers() {
     try {
       const dir = getBackupsDir();
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .slice(0, 19);
       const backupName = `faraz-pharmacy-backup-${timestamp}.db`;
       const backupPath = path.join(dir, backupName);
       fs.writeFileSync(backupPath, "");
       const stat = fs.statSync(backupPath);
-      return { success: true, name: backupName, path: backupPath, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() };
+      return {
+        success: true,
+        name: backupName,
+        path: backupPath,
+        size: stat.size,
+        createdAt: new Date(stat.birthtime || stat.mtime).toISOString(),
+      };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -148,14 +169,23 @@ function registerHandlers() {
     try {
       const dir = getBackupsDir();
       if (!fs.existsSync(dir)) return [];
-      const files = fs.readdirSync(dir)
-        .filter(f => f.endsWith(".db"))
-        .map(f => {
+      const files = fs
+        .readdirSync(dir)
+        .filter((f) => f.endsWith(".db"))
+        .map((f) => {
           const fp = path.join(dir, f);
           const stat = fs.statSync(fp);
-          return { name: f, path: fp, size: stat.size, createdAt: new Date(stat.birthtime || stat.mtime).toISOString() };
+          return {
+            name: f,
+            path: fp,
+            size: stat.size,
+            createdAt: new Date(stat.birthtime || stat.mtime).toISOString(),
+          };
         })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
       return files;
     } catch (err) {
       return [];
@@ -183,8 +213,11 @@ function registerHandlers() {
   });
 
   ipcMain.handle("settings:backup-directory-pick", async () => {
-    const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
-    if (result.canceled || result.filePaths.length === 0) return { canceled: true };
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory"],
+    });
+    if (result.canceled || result.filePaths.length === 0)
+      return { canceled: true };
     const selectedPath = result.filePaths[0];
     const cfg = loadConfig();
     cfg.backupDirectory = selectedPath;
@@ -199,7 +232,16 @@ function registerHandlers() {
   // Settings - Google Drive Config
   ipcMain.handle("settings:gdrive-get-config", () => {
     const cfg = loadConfig();
-    return cfg.googleDrive || { clientId: "", clientSecret: "", redirectUri: "", refreshToken: "", autoUpload: false, connected: false };
+    return (
+      cfg.googleDrive || {
+        clientId: "",
+        clientSecret: "",
+        redirectUri: "",
+        refreshToken: "",
+        autoUpload: false,
+        connected: false,
+      }
+    );
   });
 
   ipcMain.handle("settings:gdrive-save-config", (_, gdriveCfg) => {
@@ -210,4 +252,4 @@ function registerHandlers() {
   });
 }
 
-module.exports = { registerHandlers };
+export { registerHandlers };
