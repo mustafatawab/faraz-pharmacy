@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { loadConfig, saveConfig, getBackupsDir } = require("./config");
-const { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters } = require("./printer");
+const { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters, generateHTML, generateReturnReceiptHTML } = require("./printer");
 
 function getLocalIp() {
   const ifaces = os.networkInterfaces();
@@ -105,6 +105,24 @@ function registerHandlers() {
       return { success: true };
     } catch (e) {
       return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("print:generate-receipt-html", (_, sale, paperSize) => {
+    try {
+      const html = generateHTML(sale, paperSize || "thermal");
+      return { success: true, html };
+    } catch (e) {
+      return { success: false, error: e.message, html: "" };
+    }
+  });
+
+  ipcMain.handle("print:generate-return-receipt-html", (_, returnData, sale, paperSize) => {
+    try {
+      const html = generateReturnReceiptHTML(returnData, sale, paperSize || "thermal");
+      return { success: true, html };
+    } catch (e) {
+      return { success: false, error: e.message, html: "" };
     }
   });
 

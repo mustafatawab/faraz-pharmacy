@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Printer, FileText } from "lucide-react";
 import BarcodeInput from "@/components/pos/BarcodeInput";
 import ProductCard from "@/components/pos/ProductCard";
 import CheckoutPanel from "@/components/pos/CheckoutPanel";
+import PrintPreviewDialog from "@/components/shared/PrintPreviewDialog";
 import { useCart } from "@/hooks/useCart";
 import { useDebounce } from "@/hooks/useDebounce";
 import { api } from "@/lib/api";
@@ -18,24 +18,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Product, PrinterConfig, ProductPrice } from "@/types";
-
-const PAPER_SIZES = [
-  { value: "thermal", label: "Thermal (80mm)", icon: Printer },
-  { value: "a5", label: "A5", icon: FileText },
-  { value: "a4", label: "A4", icon: FileText },
-] as const;
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -45,25 +30,11 @@ export default function POS() {
   const cart = useCart();
   const queryClient = useQueryClient();
 
-  const [printerConfig, setPrinterConfig] = useState<PrinterConfig>({ paperSize: "thermal", deviceName: null });
-  const [printers, setPrinters] = useState<{ name: string; displayName: string; isDefault: boolean }[]>([]);
-  const [selectedPrinter, setSelectedPrinter] = useState<string>("default");
-
   const [pricePickerOpen, setPricePickerOpen] = useState(false);
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const pendingPrices = pendingProduct
     ? ((pendingProduct as any).prices as ProductPrice[] | undefined)
     : undefined;
-
-  useEffect(() => {
-    if (window.electronAPI?.printers) {
-      window.electronAPI.printers.getConfig().then((cfg) => {
-        setPrinterConfig(cfg);
-        if (cfg.deviceName) setSelectedPrinter(cfg.deviceName);
-      });
-      window.electronAPI.printers.list().then(setPrinters);
-    }
-  }, []);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", debouncedSearch],
@@ -182,6 +153,7 @@ export default function POS() {
         items: cart.items.map((item) => ({
           product_name: item.productName,
           quantity: item.quantity,
+          unit_price: item.unitPrice,
           subtotal: item.subtotal,
         })),
       };
@@ -193,35 +165,21 @@ export default function POS() {
     }
   };
 
-  async function handlePrintYes() {
-    setShowPrintDialog(false);
-    const config: PrinterConfig = {
-      paperSize: printerConfig.paperSize,
-      deviceName: selectedPrinter === "default" ? null : selectedPrinter,
-    };
-    if (window.printReceipt && pendingPrintData) {
-      const result = await window.printReceipt(pendingPrintData, config);
-      if (!result.success) {
-        setError(result.error || "Print failed");
-        toast.error(result.error || "Print failed");
-      } else {
-        toast.success("Receipt printed");
-      }
+  const generateReceiptHtml = useCallback(async (paperSize: string): Promise<string> => {
+    if (!pendingPrintData) return "";
+    const result = await window.generateReceiptHTML(pendingPrintData, paperSize);
+    return result.success ? result.html : "";
+  }, [pendingPrintData]);
+
+  async function handlePrintReceipt(config: PrinterConfig) {
+    if (!pendingPrintData) return;
+    const result = await window.printReceipt(pendingPrintData, config);
+    if (!result.success) {
+      toast.error(result.error || "Print failed");
+    } else {
+      toast.success("Receipt printed");
     }
     setPendingPrintData(null);
-  }
-
-  function handlePrintNo() {
-    setShowPrintDialog(false);
-    setPendingPrintData(null);
-  }
-
-  function handleSavePrinterPref() {
-    const config: PrinterConfig = {
-      paperSize: printerConfig.paperSize,
-      deviceName: selectedPrinter === "default" ? null : selectedPrinter,
-    };
-    window.electronAPI?.printers?.saveConfig(config);
   }
 
   return (
@@ -309,61 +267,18 @@ export default function POS() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Print Receipt</AlertDialogTitle>
-            <AlertDialogDescription>Select paper size and printer</AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-4 py-2 px-5">
-            <div className="space-y-2">
-              <Label className="text-xs">Paper Size</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {PAPER_SIZES.map(({ value, label, icon: Icon }) => (
-                  <button
-                    key={value}
-                    onClick={() => setPrinterConfig({ ...printerConfig, paperSize: value as "thermal" | "a4" | "a5" })}
-                    className={`flex flex-col items-center gap-1 p-2.5 rounded-lg border transition-colors ${
-                      printerConfig.paperSize === value
-                        ? "border-accent bg-accent/5"
-                        : "border-border hover:border-accent/50"
-                    }`}
-                  >
-                    <Icon className={`h-4 w-4 ${printerConfig.paperSize === value ? "text-accent" : "text-text-secondary"}`} />
-                    <span className={`text-[10px] font-medium ${printerConfig.paperSize === value ? "text-accent" : "text-text-secondary"}`}>
-                      {label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Printer</Label>
-              <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Default printer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default Printer</SelectItem>
-                  {printers.map((p) => (
-                    <SelectItem key={p.name} value={p.name}>
-                      {p.displayName} {p.isDefault ? "(Default)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handlePrintNo} size="sm">Don't Print</AlertDialogCancel>
-            <div className="flex gap-2">
-              <AlertDialogAction onClick={() => { handleSavePrinterPref(); handlePrintYes(); }} size="sm">
-                Print
-              </AlertDialogAction>
-            </div>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {showPrintDialog && pendingPrintData && (
+        <PrintPreviewDialog
+          open={showPrintDialog}
+          onOpenChange={(v) => {
+            setShowPrintDialog(v);
+            if (!v) setPendingPrintData(null);
+          }}
+          title="Receipt Preview"
+          htmlGenerator={generateReceiptHtml}
+          onPrint={handlePrintReceipt}
+        />
+      )}
     </div>
   );
 }

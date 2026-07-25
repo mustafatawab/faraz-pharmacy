@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, Minus, Trash2, Printer, AlertCircle, Download } from "lucide-react";
+import { Search, Plus, Minus, Trash2, AlertCircle, Download } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import DataTable from "@/components/shared/DataTable";
+import PrintPreviewDialog from "@/components/shared/PrintPreviewDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -22,21 +23,16 @@ function today() {
 export default function Returns() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [printerConfig, setPrinterConfig] = useState<PrinterConfig>({ paperSize: "thermal", deviceName: null });
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(today());
   const [selectedSaleId, setSelectedSaleId] = useState("");
   const [reason, setReason] = useState("");
   const [returnQtys, setReturnQtys] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
-  const [printDialog, setPrintDialog] = useState<{ open: boolean; returnData: ReturnEntry | null; sale: Sale | null }>({ open: false, returnData: null, sale: null });
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [pendingReturnData, setPendingReturnData] = useState<ReturnEntry | null>(null);
+  const [pendingSale, setPendingSale] = useState<Sale | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<ReturnEntry | null>(null);
-
-  useEffect(() => {
-    if (window.electronAPI?.printers) {
-      window.electronAPI.printers.getConfig().then(setPrinterConfig);
-    }
-  }, []);
 
   const { data: returns = [], isLoading } = useQuery({ queryKey: ["returns"], queryFn: api.returns.list });
 
@@ -79,7 +75,9 @@ export default function Returns() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["sales-by-date"] });
 
-      setPrintDialog({ open: true, returnData, sale: selectedSale });
+      setPendingReturnData(returnData);
+      setPendingSale(selectedSale);
+      setShowPrintPreview(true);
 
       setOpen(false);
       setSelectedSaleId("");
@@ -93,18 +91,28 @@ export default function Returns() {
     },
   });
 
-  async function handlePrintReceipt() {
-    if (!printDialog.returnData || !printDialog.sale) return;
+  const generateReturnHtml = useCallback(async (paperSize: string): Promise<string> => {
+    if (!pendingReturnData || !pendingSale) return "";
     const printPayload = {
-      ...printDialog.returnData,
-      items: printDialog.returnData.items || [],
-      reason: printDialog.returnData.reason,
+      ...pendingReturnData,
+      items: pendingReturnData.items || [],
+      reason: pendingReturnData.reason,
     };
-    const result = await window.printReturnReceipt(printPayload, printDialog.sale, printerConfig);
+    const result = await window.generateReturnReceiptHTML(printPayload, pendingSale, paperSize);
+    return result.success ? result.html : "";
+  }, [pendingReturnData, pendingSale]);
+
+  async function handlePrintReturn(config: PrinterConfig) {
+    if (!pendingReturnData || !pendingSale) return;
+    const printPayload = {
+      ...pendingReturnData,
+      items: pendingReturnData.items || [],
+      reason: pendingReturnData.reason,
+    };
+    const result = await window.printReturnReceipt(printPayload, pendingSale, config);
     if (!result.success) {
-      toast.error("Print failed: " + (result.error || "Unknown error"));
+      throw new Error(result.error || "Print failed");
     }
-    setPrintDialog({ open: false, returnData: null, sale: null });
   }
 
   const columns = [
@@ -275,20 +283,21 @@ export default function Returns() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={printDialog.open} onOpenChange={(o) => { if (!o) setPrintDialog({ open: false, returnData: null, sale: null }); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Printer className="h-4 w-4" />
-              Print Return Receipt?
-            </DialogTitle>
-          </DialogHeader>
-          <div className="px-5 pb-5 flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setPrintDialog({ open: false, returnData: null, sale: null })}>No</Button>
-            <Button onClick={handlePrintReceipt}>Yes, Print</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {showPrintPreview && pendingReturnData && pendingSale && (
+        <PrintPreviewDialog
+          open={showPrintPreview}
+          onOpenChange={(v) => {
+            setShowPrintPreview(v);
+            if (!v) {
+              setPendingReturnData(null);
+              setPendingSale(null);
+            }
+          }}
+          title="Return Receipt Preview"
+          htmlGenerator={generateReturnHtml}
+          onPrint={handlePrintReturn}
+        />
+      )}
 
       <Dialog open={!!selectedReturn} onOpenChange={(v) => { if (!v) setSelectedReturn(null); }}>
         <DialogContent className="max-w-lg">

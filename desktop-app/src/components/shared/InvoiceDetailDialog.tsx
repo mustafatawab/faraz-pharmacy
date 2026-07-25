@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Printer } from "lucide-react";
 import {
   Dialog,
@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { api } from "@/lib/api";
 import StatusBadge from "@/components/shared/StatusBadge";
-import type { Sale } from "@/types";
+import PrintPreviewDialog from "@/components/shared/PrintPreviewDialog";
+import type { Sale, PrinterConfig } from "@/types";
 
 interface InvoiceDetailDialogProps {
   open: boolean;
@@ -20,7 +21,7 @@ interface InvoiceDetailDialogProps {
 export default function InvoiceDetailDialog({ open, onOpenChange, saleId }: InvoiceDetailDialogProps) {
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(false);
-  const [printing, setPrinting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (!open || !saleId) return;
@@ -34,31 +35,36 @@ export default function InvoiceDetailDialog({ open, onOpenChange, saleId }: Invo
     });
   }, [open, saleId]);
 
-  async function handlePrint() {
+  const generateReceiptHtml = useCallback(async (paperSize: string): Promise<string> => {
+    if (!sale) return "";
+    const printData = {
+      ...sale,
+      customer_total_arrears: 0,
+      items: sale.items?.map((i) => ({
+        product_name: i.product_name,
+        quantity: i.quantity,
+        subtotal: i.subtotal,
+      })) || [],
+    };
+    const result = await window.generateReceiptHTML(printData, paperSize);
+    return result.success ? result.html : "";
+  }, [sale]);
+
+  async function handlePrint(config: PrinterConfig) {
     if (!sale) return;
-    setPrinting(true);
-    try {
-      let config = undefined;
-      if (window.electronAPI?.printers?.getConfig) {
-        config = await window.electronAPI.printers.getConfig();
-      }
-      const printData = {
-        ...sale,
-        customer_total_arrears: 0,
-        items: sale.items?.map((i) => ({
-          product_name: i.product_name,
-          quantity: i.quantity,
-          subtotal: i.subtotal,
-        })) || [],
-      };
-      const result = await window.printReceipt(printData, config || { paperSize: "thermal", deviceName: null });
-      if (!result.success) {
-        alert("Print failed: " + (result.error || "Unknown error"));
-      }
-    } catch (e) {
-      alert("Print failed: " + (e as Error).message);
+    const printData = {
+      ...sale,
+      customer_total_arrears: 0,
+      items: sale.items?.map((i) => ({
+        product_name: i.product_name,
+        quantity: i.quantity,
+        subtotal: i.subtotal,
+      })) || [],
+    };
+    const result = await window.printReceipt(printData, config);
+    if (!result.success) {
+      throw new Error(result.error || "Print failed");
     }
-    setPrinting(false);
   }
 
   return (
@@ -151,16 +157,25 @@ export default function InvoiceDetailDialog({ open, onOpenChange, saleId }: Invo
 
             <Button
               size="sm"
-              onClick={handlePrint}
-              disabled={printing}
+              onClick={() => setShowPreview(true)}
               className="w-full mt-5 h-8 gap-1.5 text-xs"
             >
               <Printer className="h-3.5 w-3.5" />
-              {printing ? "Printing..." : "Print Receipt"}
+              Print Receipt
             </Button>
           </div>
         )}
       </DialogContent>
+
+      {showPreview && sale && (
+        <PrintPreviewDialog
+          open={showPreview}
+          onOpenChange={setShowPreview}
+          title="Invoice Preview"
+          htmlGenerator={generateReceiptHtml}
+          onPrint={handlePrint}
+        />
+      )}
     </Dialog>
   );
 }

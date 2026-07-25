@@ -67,5 +67,7 @@ declare global {
     printReturnReceipt: (returnData: unknown, sale: unknown, printerConfig?: PrinterConfig) => Promise<{ success: boolean; error?: string }>;
     printBarcodeLabel: (barcode: string, copies: number, labelWidth?: number, labelHeight?: number) => Promise<{ success: boolean; error?: string }>;
     getUSBPrinters: () => Promise<USBPrinterInfo[]>;
+    generateReceiptHTML: (sale: unknown, paperSize?: string) => Promise<{ success: boolean; html: string; error?: string }>;
+    generateReturnReceiptHTML: (returnData: unknown, sale: unknown, paperSize?: string) => Promise<{ success: boolean; html: string; error?: string }>;
   }
 }

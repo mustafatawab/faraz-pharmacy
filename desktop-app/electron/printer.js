@@ -28,84 +28,137 @@ function generateSaleReceiptHTML(sale) {
 <html>
 <head>
 <meta charset="utf-8">
-
 <style>
-@page { size: 80mm auto; margin: 0; }
+@page { size: 80mm auto; margin: 10;
+  text-align:center; }
+
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
-  width: 300px;
+  width: 80mm;
+  margin: 0 auto;
   font-family: 'Courier New', monospace;
   font-size: 12px;
   color: #000;
-  padding: 8px;
+  padding: 4mm 3mm;
+  line-height: 1.3;
 }
 
 .center { text-align: center; }
-.header { font-weight: bold; font-size: 18px; }
-.small { font-size: 10px; }
 
-.divider { border-top: 1px dashed #000; margin: 8px 0; }
-
-table { width: 100%; border-collapse: collapse; }
-
-th {
-  border-bottom: 1px solid #000;
-  text-align: left;
-  font-size: 11px;
+.store-name {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
 }
 
-td { padding: 2px 0; }
+.store-info {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.divider { border-top: 1px dashed #000; margin: 6px 0; }
+
+.info-row {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+
+.item-table th {
+  border-bottom: 1px solid #000;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 0 2px;
+  text-align: left;
+}
+
+.item-table th:nth-child(1) { width: 40%; }
+.item-table th:nth-child(2) { width: 12%; text-align: center; }
+.item-table th:nth-child(3) { width: 22%; text-align: right; }
+.item-table th:nth-child(4) { width: 26%; text-align: right; }
+
+.item-table td {
+  padding: 2px 0;
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  word-wrap: break-word;
+  white-space: nowrap;
+}
+
+.item-table td:nth-child(1) { overflow: hidden; text-overflow: ellipsis; }
+.item-table td:nth-child(2) { text-align: center; }
+.item-table td:nth-child(3) { text-align: right; }
+.item-table td:nth-child(4) { text-align: right; }
 
 .text-right { text-align: right; }
 
-.total-box {
+.summary-table td {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 0;
+}
+
+.total-box td {
+  font-weight: 800;
+  font-size: 14px;
+  padding: 4px 0;
   border-top: 2px solid #000;
   border-bottom: 2px solid #000;
-  font-weight: bold;
-  font-size: 14px;
 }
 
 .urdu {
   direction: rtl;
   font-family: Arial, sans-serif;
   font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.footer-text {
+  font-size: 10px;
+  font-weight: 600;
 }
 </style>
-
 </head>
 
 <body>
 
 <div class="center">
-  <div class="header">FARAZ PHARMACY</div>
-  <div class="small">Near Civil Hospital Barikot, Swat</div>
-  <div class="small">Phone: 03469383792 / 03449006940</div>
+  <div class="store-name">FARAZ PHARMACY</div>
+  <div class="store-info">Near Civil Hospital Barikot, Swat</div>
+  <div class="store-info">Phone: 03469383792 / 03449006940</div>
 </div>
 
 <div class="divider"></div>
 
-<div>Invoice #: ${sale.id || Math.floor(Math.random() * 100000)}</div>
-<div>Date: ${dateStr}</div>
-<div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
-<div>No. of items: ${items.length}</div>
+<div class="info-row">Invoice #: ${sale.id ? sale.id.slice(0, 8) : Math.floor(Math.random() * 100000)}</div>
+<div class="info-row">Date: ${dateStr}</div>
+<div class="info-row">Customer: ${sale.customer_name || "Walk-in Customer"}</div>
+<div class="info-row">Items: ${items.length}</div>
 
 <div class="divider"></div>
 
-<table>
+<table class="item-table">
   <thead>
     <tr>
       <th>Product</th>
       <th>Qty</th>
-      <th class="text-right">Amount</th>
+      <th>Price</th>
+      <th>Amount</th>
     </tr>
   </thead>
-
   <tbody>
     ${items.map(item => `
       <tr>
         <td>${item.product_name}</td>
         <td>${item.quantity}</td>
-        <td class="text-right">${item.subtotal.toFixed(0)}</td>
+        <td>${(item.unit_price || 0).toFixed(0)}</td>
+        <td>${item.subtotal.toFixed(0)}</td>
       </tr>
     `).join("")}
   </tbody>
@@ -113,33 +166,28 @@ td { padding: 2px 0; }
 
 <div class="divider"></div>
 
-<table>
+<table class="summary-table">
   <tr>
     <td>Subtotal</td>
     <td class="text-right">${sale.subtotal.toFixed(0)}</td>
   </tr>
-
   ${sale.discount > 0 ? `
   <tr>
     <td>Discount</td>
     <td class="text-right">-${sale.discount.toFixed(0)}</td>
   </tr>` : ""}
-
   <tr class="total-box">
     <td>TOTAL</td>
     <td class="text-right">${totalAmount.toFixed(0)}</td>
   </tr>
-
   <tr>
     <td>Paid</td>
     <td class="text-right">${paid.toFixed(0)}</td>
   </tr>
-
   <tr>
     <td>Balance</td>
     <td class="text-right">${balance.toFixed(0)}</td>
   </tr>
-
   <tr>
     <td>Arrears</td>
     <td class="text-right">${arrears.toFixed(0)}</td>
@@ -161,7 +209,7 @@ td { padding: 2px 0; }
 
 <div class="divider"></div>
 
-<div class="center">
+<div class="center footer-text">
   <b>
     ${sale.status === "partial"
       ? "PARTIAL PAYMENT"
@@ -172,7 +220,7 @@ td { padding: 2px 0; }
 
 <div class="divider"></div>
 
-<div class="center small">
+<div class="center footer-text">
   THANK YOU FOR YOUR VISIT<br>
   Get Well Soon ❤️<br><br>
   Powered by Faraz Pharmacy POS
@@ -877,7 +925,7 @@ function generateReturnReceiptHTML(returnData, sale, paperSize) {
     : "@page { margin: 5mm; size: A5; }";
 
   const baseStyle = isThermal
-    ? `body { font-family: 'Courier New', 'Consolas', monospace; font-size: 14px; color: #000; display: flex; flex-direction: column; align-items: center; } .receipt { width: 72mm; }`
+    ? `body { font-family: 'Courier New', monospace; font-size: 12px; color: #000; padding: 4mm 3mm; line-height: 1.3; } .receipt { width: 100%; }`
     : `body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #000; }`;
 
   const itemsHTML = items.map(i => {
@@ -893,17 +941,17 @@ ${pageCSS}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 ${isThermal ? "html, body { height: 100%; }" : ""}
 ${baseStyle}
-h1 { text-align: center; margin-bottom: 4px; font-size: ${isThermal ? "22px" : "20px"}; letter-spacing: 2px; font-weight: bold; }
-.sub { text-align: center; font-size: 11px; margin-bottom: 8px; color: #333; }
-.badge { text-align: center; font-size: ${isThermal ? "14px" : "14px"}; font-weight: bold; color: #c00; margin: 6px 0; letter-spacing: 1px; }
-hr { border: none; border-top: 2px solid #000; margin: 6px 0; }
+h1 { text-align: center; margin-bottom: 4px; font-size: ${isThermal ? "20px" : "20px"}; letter-spacing: 1px; font-weight: 800; }
+.sub { text-align: center; font-size: ${isThermal ? "10px" : "11px"}; margin-bottom: 6px; color: #333; font-weight: 600; }
+.badge { text-align: center; font-size: ${isThermal ? "13px" : "14px"}; font-weight: 800; color: #c00; margin: 6px 0; letter-spacing: 1px; }
+hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
 hr.dashed { border-top: 1px dashed #888; }
-table { width: 100%; border-collapse: collapse; }
-th { text-align: left; font-size: 11px; border-bottom: 2px solid #000; padding: 3px 0; font-weight: bold; }
-td { font-size: 13px; padding: 3px 0; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th { text-align: left; font-size: 11px; border-bottom: 1px solid #000; padding: 3px 0; font-weight: 700; }
+td { font-size: ${isThermal ? "11px" : "13px"}; padding: 2px 0; font-weight: 600; }
 td:last-child { text-align: right; }
-.big td { font-weight: bold; font-size: 15px; padding-top: 6px; border-top: 2px solid #000; }
-.ftr { text-align: center; font-size: 11px; margin-top: 8px; color: #555; }
+.big td { font-weight: 800; font-size: ${isThermal ? "13px" : "15px"}; padding-top: 4px; border-top: 1px solid #000; }
+.ftr { text-align: center; font-size: ${isThermal ? "10px" : "11px"}; margin-top: 6px; color: #555; font-weight: 600; }
 </style></head><body>
 <div class="receipt">
 <h1>FARAZ PHARMACY</h1>
@@ -935,15 +983,37 @@ function getPrintOptions(printerConfig) {
     deviceName: printerConfig?.deviceName || undefined,
   };
 
+  const margins = printerConfig?.margins;
+
   if (paperSize === "thermal") {
+    opts.pageSize = { width: 80000, height: 297000 };
     opts.margins = { marginType: "none" };
-    opts.pageSize = { width: 70000, height: 397000 };
   } else if (paperSize === "a4") {
-    opts.margins = { marginType: "printableArea" };
     opts.pageSize = "A4";
+    if (margins) {
+      opts.margins = {
+        marginType: "custom",
+        top: margins.top,
+        bottom: margins.bottom,
+        left: margins.left,
+        right: margins.right,
+      };
+    } else {
+      opts.margins = { marginType: "printableArea" };
+    }
   } else if (paperSize === "a5") {
-    opts.margins = { marginType: "printableArea" };
     opts.pageSize = "A5";
+    if (margins) {
+      opts.margins = {
+        marginType: "custom",
+        top: margins.top,
+        bottom: margins.bottom,
+        left: margins.left,
+        right: margins.right,
+      };
+    } else {
+      opts.margins = { marginType: "printableArea" };
+    }
   }
 
   return opts;
@@ -1284,10 +1354,15 @@ function doPrintJob(htmlContent, printerConfig) {
     const filePath = writeTempFile(htmlContent, "html");
 
     const printWin = new BrowserWindow({
-      width: paperSize === "a4" ? 800 : 600,
+      width: paperSize === "a4" ? 800 : paperSize === "thermal" ? 350 : 600,
       height: 600,
       show: false,
-      webPreferences: { nodeIntegration: false, contextIsolation: true },
+      paintWhenReady: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: false,
+      },
     });
 
     let resolved = false;
@@ -1300,20 +1375,41 @@ function doPrintJob(htmlContent, printerConfig) {
 
     function doPrint() {
       if (resolved) return;
-      try {
-        printWin.webContents.print(getPrintOptions(printerConfig), (success) => {
+      printWin.webContents.executeJavaScript("document.body.scrollHeight").then(() => {
+        setTimeout(() => {
           if (resolved) return;
-          if (!success) {
+          try {
+            printWin.webContents.print(getPrintOptions(printerConfig), (success) => {
+              if (resolved) return;
+              if (!success) {
+                cleanup();
+                return reject(new Error("Print failed or cancelled"));
+              }
+              cleanup();
+              resolve();
+            });
+          } catch (e) {
             cleanup();
-            return reject(new Error("Print failed or cancelled"));
+            reject(e);
           }
+        }, 300);
+      }).catch(() => {
+        if (resolved) return;
+        try {
+          printWin.webContents.print(getPrintOptions(printerConfig), (success) => {
+            if (resolved) return;
+            if (!success) {
+              cleanup();
+              return reject(new Error("Print failed or cancelled"));
+            }
+            cleanup();
+            resolve();
+          });
+        } catch (e) {
           cleanup();
-          resolve();
-        });
-      } catch (e) {
-        cleanup();
-        reject(e);
-      }
+          reject(e);
+        }
+      });
     }
 
     printWin.webContents.on("did-finish-load", doPrint);
@@ -1377,4 +1473,4 @@ async function listUSBPrinters() {
   return printers;
 }
 
-module.exports = { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters };
+module.exports = { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters, generateHTML, generateReturnReceiptHTML };

@@ -26,3 +26,5 @@ contextBridge.exposeInMainWorld("printReceipt", (sale, printerConfig) => ipcRend
 contextBridge.exposeInMainWorld("printReturnReceipt", (returnData, sale, printerConfig) => ipcRenderer.invoke("print:return-receipt", returnData, sale, printerConfig));
 contextBridge.exposeInMainWorld("printBarcodeLabel", (barcode, copies, labelWidth, labelHeight) => ipcRenderer.invoke("print:barcode-label", barcode, copies, labelWidth, labelHeight));
 contextBridge.exposeInMainWorld("getUSBPrinters", () => ipcRenderer.invoke("usb-printers:list"));
+contextBridge.exposeInMainWorld("generateReceiptHTML", (sale, paperSize) => ipcRenderer.invoke("print:generate-receipt-html", sale, paperSize));
+contextBridge.exposeInMainWorld("generateReturnReceiptHTML", (returnData, sale, paperSize) => ipcRenderer.invoke("print:generate-return-receipt-html", returnData, sale, paperSize));
