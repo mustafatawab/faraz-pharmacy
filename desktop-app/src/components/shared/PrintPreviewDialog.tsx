@@ -21,9 +21,9 @@ import { toast } from "sonner";
 import type { PrinterConfig, PrintMargins } from "@/types";
 
 const PAPER_SIZES = [
-  { value: "thermal", label: "Thermal (80mm)", icon: Printer },
-  { value: "a5", label: "A5", icon: FileText },
-  { value: "a4", label: "A4", icon: FileText },
+  { value: "thermal", label: "Thermal (80mm)" },
+  { value: "a5", label: "A5" },
+  { value: "a4", label: "A4" },
 ] as const;
 
 const DEFAULT_MARGINS: PrintMargins = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -49,14 +49,19 @@ export default function PrintPreviewDialog({
 }: PrintPreviewDialogProps) {
   const [paperSize, setPaperSize] = useState<string>(initialPaperSize);
   const [selectedPrinter, setSelectedPrinter] = useState<string>("default");
-  const [printers, setPrinters] = useState<{ name: string; displayName: string; isDefault: boolean }[]>([]);
+  const [printers, setPrinters] = useState<
+    { name: string; displayName: string; isDefault: boolean }[]
+  >([]);
   const [margins, setMargins] = useState<PrintMargins>(DEFAULT_MARGINS);
   const [html, setHtml] = useState("");
   const [loadingHtml, setLoadingHtml] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [showMargins, setShowMargins] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [savedConfig, setSavedConfig] = useState<PrinterConfig>({ paperSize: "thermal", deviceName: null });
+  const [savedConfig, setSavedConfig] = useState<PrinterConfig>({
+    paperSize: "thermal",
+    deviceName: null,
+  });
 
   useEffect(() => {
     if (window.electronAPI?.printers) {
@@ -66,7 +71,12 @@ export default function PrintPreviewDialog({
         if (cfg.deviceName) setSelectedPrinter(cfg.deviceName);
         if (cfg.margins) setMargins(cfg.margins);
         else {
-          const def = cfg.paperSize === "a4" ? A4_MARGINS : cfg.paperSize === "a5" ? A5_MARGINS : DEFAULT_MARGINS;
+          const def =
+            cfg.paperSize === "a4"
+              ? A4_MARGINS
+              : cfg.paperSize === "a5"
+                ? A5_MARGINS
+                : DEFAULT_MARGINS;
           setMargins(def);
         }
       });
@@ -77,15 +87,22 @@ export default function PrintPreviewDialog({
   useEffect(() => {
     if (!open) return;
     setLoadingHtml(true);
-    htmlGenerator(paperSize).then((h) => {
-      setHtml(h);
-      setLoadingHtml(false);
-    }).catch(() => setLoadingHtml(false));
+    htmlGenerator(paperSize)
+      .then((h) => {
+        setHtml(h);
+        setLoadingHtml(false);
+      })
+      .catch(() => setLoadingHtml(false));
   }, [open, paperSize, htmlGenerator]);
 
   useEffect(() => {
     if (!open) return;
-    const def = paperSize === "a4" ? A4_MARGINS : paperSize === "a5" ? A5_MARGINS : DEFAULT_MARGINS;
+    const def =
+      paperSize === "a4"
+        ? A4_MARGINS
+        : paperSize === "a5"
+          ? A5_MARGINS
+          : DEFAULT_MARGINS;
     if (!savedConfig.margins) setMargins(def);
   }, [paperSize, open]);
 
@@ -101,7 +118,11 @@ export default function PrintPreviewDialog({
   }, [html]);
 
   function getDefaultMargins() {
-    return paperSize === "a4" ? A4_MARGINS : paperSize === "a5" ? A5_MARGINS : DEFAULT_MARGINS;
+    return paperSize === "a4"
+      ? A4_MARGINS
+      : paperSize === "a5"
+        ? A5_MARGINS
+        : DEFAULT_MARGINS;
   }
 
   async function handlePrint() {
@@ -121,7 +142,10 @@ export default function PrintPreviewDialog({
     setPrinting(false);
   }
 
-  function updateMargin(side: "top" | "bottom" | "left" | "right", value: string) {
+  function updateMargin(
+    side: "top" | "bottom" | "left" | "right",
+    value: string,
+  ) {
     const num = parseFloat(value) || 0;
     setMargins((prev) => ({ ...prev, [side]: num }));
   }
@@ -130,51 +154,63 @@ export default function PrintPreviewDialog({
     setMargins(getDefaultMargins());
   }
 
-  const previewWidth = paperSize === "thermal" ? 320 : paperSize === "a5" ? 480 : 680;
+  const previewWidth =
+    paperSize === "thermal" ? 320 : paperSize === "a5" ? 480 : 680;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col gap-0 p-0">
+        <DialogHeader className="px-5 pt-4 pb-0">
+          <DialogTitle className="flex items-center gap-2 text-sm">
+            <Eye className="h-4 w-4 text-accent" />
             {title}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="px-5 space-y-3">
-          <div className="flex items-end gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Paper Size</Label>
-              <div className="flex gap-1.5">
-                {PAPER_SIZES.map(({ value, label, icon: Icon }) => (
+        <div className="px-5 pt-3 pb-2 space-y-2.5">
+          <div className="flex items-end gap-2.5 flex-wrap">
+            <div className="space-y-1">
+              <Label className="text-[10px] text-text-secondary font-medium">
+                Paper Size
+              </Label>
+              <div className="flex gap-1">
+                {PAPER_SIZES.map(({ value, label }) => (
                   <button
                     key={value}
                     onClick={() => setPaperSize(value)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-medium transition-colors ${
+                    className={`px-2.5 py-1.5 rounded-md border text-[11px] font-medium transition-colors ${
                       paperSize === value
                         ? "border-accent bg-accent/5 text-accent"
                         : "border-border text-text-secondary hover:border-accent/50"
                     }`}
                   >
-                    <Icon className="h-3 w-3" />
                     {label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-1.5 flex-1 max-w-[220px]">
-              <Label className="text-xs">Printer</Label>
-              <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
-                <SelectTrigger className="h-8 text-xs">
+            <div className="space-y-1 flex-1 min-w-[160px] max-w-[220px]">
+              <Label className="text-[10px] text-text-secondary font-medium">
+                Printer
+              </Label>
+              <Select
+                value={selectedPrinter}
+                onValueChange={setSelectedPrinter}
+              >
+                <SelectTrigger className="h-7 text-[11px]">
                   <SelectValue placeholder="Default printer" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="default">Default Printer</SelectItem>
                   {printers.map((p) => (
                     <SelectItem key={p.name} value={p.name}>
-                      {p.displayName} {p.isDefault ? "(Default)" : ""}
+                      {p.displayName}{" "}
+                      {p.isDefault ? (
+                        <span className="text-text-secondary">(Default)</span>
+                      ) : (
+                        ""
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -184,7 +220,7 @@ export default function PrintPreviewDialog({
             <Button
               variant="outline"
               size="sm"
-              className="h-8 gap-1.5"
+              className="h-7 gap-1 text-[11px]"
               onClick={() => setShowMargins(!showMargins)}
               disabled={paperSize === "thermal"}
             >
@@ -195,10 +231,14 @@ export default function PrintPreviewDialog({
 
           {showMargins && paperSize !== "thermal" && (
             <div className="flex items-end gap-2 p-2.5 rounded-lg border border-border bg-surface-2/50">
-              <span className="text-[10px] text-text-secondary font-medium pb-1.5">Margins (mm)</span>
+              <span className="text-[10px] text-text-secondary font-medium pb-1.5 pr-1">
+                Margins (mm)
+              </span>
               {(["top", "left", "right", "bottom"] as const).map((side) => (
-                <div key={side} className="space-y-1">
-                  <Label className="text-[9px] text-text-secondary capitalize">{side}</Label>
+                <div key={side} className="space-y-0.5">
+                  <Label className="text-[9px] text-text-secondary capitalize block">
+                    {side}
+                  </Label>
                   <Input
                     type="number"
                     min={0}
@@ -206,21 +246,29 @@ export default function PrintPreviewDialog({
                     step={1}
                     value={margins[side]}
                     onChange={(e) => updateMargin(side, e.target.value)}
-                    className="h-7 w-16 text-xs font-mono text-center px-1"
+                    className="h-7 w-14 text-[11px] font-mono text-center px-1"
                   />
                 </div>
               ))}
-              <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={resetMargins}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-[10px]"
+                onClick={resetMargins}
+              >
                 Reset
               </Button>
             </div>
           )}
         </div>
 
-        <div className="flex-1 min-h-0 px-5 py-3 overflow-auto flex justify-center">
+        <div className="flex-1 min-h-0 px-5 py-2 overflow-auto flex justify-center bg-surface-2/30">
           {loadingHtml ? (
             <div className="flex items-center justify-center w-full h-48 text-xs text-text-secondary">
-              Loading preview...
+              <div className="flex flex-col items-center gap-2">
+                <span className="h-5 w-5 rounded-full border-2 border-border border-t-accent animate-spin" />
+                Loading preview...
+              </div>
             </div>
           ) : html ? (
             <div
@@ -234,6 +282,7 @@ export default function PrintPreviewDialog({
                   width: "100%",
                   minHeight: 400,
                   border: "none",
+                  display: "block",
                 }}
               />
             </div>
@@ -244,11 +293,21 @@ export default function PrintPreviewDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="px-5 py-3 border-t border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="text-xs"
+          >
             Cancel
           </Button>
-          <Button size="sm" onClick={handlePrint} disabled={printing || loadingHtml} className="gap-1.5">
+          <Button
+            size="sm"
+            onClick={handlePrint}
+            disabled={printing || loadingHtml}
+            className="gap-1.5 text-xs"
+          >
             <Printer className="h-3.5 w-3.5" />
             {printing ? "Printing..." : "Print"}
           </Button>
