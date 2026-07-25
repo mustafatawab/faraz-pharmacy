@@ -699,7 +699,7 @@ function generateESCPOSReturnReceipt(returnData, sale) {
   return Buffer.concat(parts);
 }
 
-function findUSBEndpoint(iface) {
+function findBulkOutEndpoint(iface) {
   const eps = iface.endpoints;
   if (eps) {
     for (const ep of eps) {
@@ -708,24 +708,40 @@ function findUSBEndpoint(iface) {
       }
     }
   }
-  return 1;
+  return null;
 }
 
-async function findUSBPrinter(interfaceClass, excludeVendorId) {
+function isPrinterInterface(iface) {
+  try {
+    const alt = iface.alternate;
+    if (!alt) return false;
+    const ifClass = alt.interfaceClass;
+    if (ifClass === 7) return true;
+    if (ifClass === 0xff) {
+      const eps = alt.endpoints || [];
+      return eps.some(ep => ep.direction === "out" && ep.type === "bulk");
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function findUSBPrinter(options = {}) {
+  const { excludeVendorId } = options;
   const devices = await usb.getDevices();
   for (const d of devices) {
     try {
       if (excludeVendorId && d.vendorId === excludeVendorId) continue;
-      const configs = d.configurations;
-      if (!configs || configs.length === 0) continue;
-      for (const cfg of configs) {
-        for (const iface of cfg.interfaces) {
-          if (
-            iface.alternate &&
-            iface.alternate.interfaceClass === (interfaceClass || 7)
-          ) {
-            const endpoint = findUSBEndpoint(iface);
-            if (endpoint) return { device: d, endpoint };
+      const cfgs = d.configurations;
+      if (!cfgs || cfgs.length === 0) continue;
+      for (const cfg of cfgs) {
+        for (let i = 0; i < cfg.interfaces.length; i++) {
+          const iface = cfg.interfaces[i];
+          if (!isPrinterInterface(iface)) continue;
+          const ep = findBulkOutEndpoint(iface);
+          if (ep !== null) {
+            return { device: d, interfaceNum: i, endpoint: ep };
           }
         }
       }
@@ -735,26 +751,26 @@ async function findUSBPrinter(interfaceClass, excludeVendorId) {
 }
 
 async function doUSBPrint(dataBuffer) {
-  const result = await findUSBPrinter(7, ZEBRA_VENDOR_ID);
+  const result = await findUSBPrinter({ excludeVendorId: ZEBRA_VENDOR_ID });
   if (!result) {
     console.error("doUSBPrint: No USB printer found (excluding Zebra)");
     throw new Error("No USB printer found. Check connection and power.");
   }
-  const { device, endpoint } = result;
+  const { device, interfaceNum, endpoint } = result;
   const printerName = safeProductName(device);
   console.log(
-    `doUSBPrint: Found device "${printerName}" endpoint=${endpoint} bufferSize=${dataBuffer.length}`,
+    `doUSBPrint: Found device "${printerName}" interface=${interfaceNum} endpoint=${endpoint} bufferSize=${dataBuffer.length}`,
   );
 
   await device.open();
   console.log("doUSBPrint: device opened");
   try {
-    await device.detachKernelDriver(0);
+    await device.detachKernelDriver(interfaceNum);
     console.log("doUSBPrint: detachKernelDriver OK");
   } catch (_) {
     console.log("doUSBPrint: detachKernelDriver skipped");
   }
-  await device.claimInterface(0);
+  await device.claimInterface(interfaceNum);
   console.log("doUSBPrint: interface claimed");
   try {
     const writeResult = await device.transferOut(endpoint, dataBuffer);
@@ -764,7 +780,7 @@ async function doUSBPrint(dataBuffer) {
     }
   } finally {
     try {
-      await device.releaseInterface(0);
+      await device.releaseInterface(interfaceNum);
       console.log("doUSBPrint: interface released");
     } catch (_) {
       console.log("doUSBPrint: releaseInterface skipped");
@@ -785,13 +801,14 @@ async function findZebraPrinter() {
   for (const d of devices) {
     try {
       if (d.vendorId !== ZEBRA_VENDOR_ID) continue;
-      const configs = d.configurations;
-      if (!configs || configs.length === 0) continue;
-      for (const cfg of configs) {
-        for (const iface of cfg.interfaces) {
-          if (iface.alternate && iface.alternate.interfaceClass === 7) {
-            return d;
-          }
+      const cfgs = d.configurations;
+      if (!cfgs || cfgs.length === 0) continue;
+      for (const cfg of cfgs) {
+        for (let i = 0; i < cfg.interfaces.length; i++) {
+          const iface = cfg.interfaces[i];
+          if (!isPrinterInterface(iface)) continue;
+          const ep = findBulkOutEndpoint(iface);
+          if (ep !== null) return { device: d, interfaceNum: i, endpoint: ep };
         }
       }
     } catch (_) {}
@@ -800,23 +817,24 @@ async function findZebraPrinter() {
 }
 
 async function doUSBZPLPrint(dataBuffer) {
-  const device = await findZebraPrinter();
-  if (!device) {
+  const result = await findZebraPrinter();
+  if (!result) {
     throw new Error("No Zebra printer found. Check connection and power.");
   }
+  const { device, interfaceNum, endpoint } = result;
   await device.open();
   try {
-    await device.detachKernelDriver(0);
+    await device.detachKernelDriver(interfaceNum);
   } catch (_) {}
-  await device.claimInterface(0);
+  await device.claimInterface(interfaceNum);
   try {
-    const result = await device.transferOut(1, dataBuffer);
-    if (result.status !== "ok") {
-      throw new Error("Zebra USB write failed: " + result.status);
+    const transferResult = await device.transferOut(endpoint, dataBuffer);
+    if (transferResult.status !== "ok") {
+      throw new Error("Zebra USB write failed: " + transferResult.status);
     }
   } finally {
     try {
-      await device.releaseInterface(0);
+      await device.releaseInterface(interfaceNum);
     } catch (_) {}
     try {
       device.close();
@@ -970,17 +988,17 @@ async function listUSBPrinters() {
     try {
       const cfgs = d.configurations;
       if (!cfgs || cfgs.length === 0) continue;
-      let isPrinter = false;
+      let found = false;
       for (const cfg of cfgs) {
         for (const iface of cfg.interfaces) {
-          if (iface.alternate && iface.alternate.interfaceClass === 7) {
-            isPrinter = true;
+          if (isPrinterInterface(iface)) {
+            found = true;
             break;
           }
         }
-        if (isPrinter) break;
+        if (found) break;
       }
-      if (!isPrinter) continue;
+      if (!found) continue;
       printers.push({
         vendorId: d.vendorId,
         productId: d.productId,
