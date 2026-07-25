@@ -9,6 +9,8 @@ import {
   printReturnReceipt,
   printBarcodeLabel,
   listUSBPrinters,
+  generateHTML,
+  generateReturnReceiptHTML,
 } from "./printer.js";
 
 function getLocalIp() {

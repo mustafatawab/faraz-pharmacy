@@ -1325,4 +1325,4 @@ async function listUSBPrinters() {
   return printers;
 }
 
-export { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters };
+export { printReceipt, printReturnReceipt, printBarcodeLabel, listUSBPrinters, generateHTML, generateReturnReceiptHTML };
