@@ -33,111 +33,284 @@ function safeSerial(device) {
   return safeDeviceProp(device, "serialNumber") || null;
 }
 
+
 function generateSaleReceiptHTML(sale) {
   const items = sale.items || [];
+
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-PK", {
-    day: "2-digit", month: "2-digit", year: "numeric",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
+
   const timeStr = now.toLocaleTimeString("en-PK", {
-    hour: "2-digit", minute: "2-digit", hour12: true,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   });
+
   const subtotal = sale.subtotal || 0;
   const totalAmount = sale.total || 0;
   const discount = sale.discount || 0;
+  const gst = sale.gst || 0;
   const paid = sale.amount_paid || 0;
   const balance = Math.max(0, totalAmount - paid);
-  const changeDue = sale.change || 0;
-  const gst = sale.gst || 0;
+  const arrears = sale.arrears || 0;
+  const totalPayable = totalAmount + arrears;
 
-  const itemsHTML = items.map(item => {
-    const unitPrice = item.unit_price || item.subtotal / item.quantity;
-    return `<tr><td>${item.product_name}</td><td class="r">${item.quantity}</td><td class="r">${Math.round(unitPrice)}</td><td class="r">${Math.round(item.subtotal)}</td></tr>`;
-  }).join("");
+  const itemsHTML = items
+    .map((item) => {
+      const unitPrice = item.unit_price || item.subtotal / item.quantity;
 
-  return `<!DOCTYPE html>
-<html>
+      return `
+      <tr>
+          <td>${item.product_name}</td>
+          <td>${item.quantity}</td>
+          <td>${unitPrice}</td>
+          <td class="right">${item.subtotal}</td>
+      </tr>
+      `;
+    })
+    .join("");
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
+
 <style>
-@page { size: 80mm auto; margin: 0; }
-body {
-  width: 76mm; margin: 0; padding: 3mm 2mm;
-  font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  font-size: 13px; color: #000; line-height: 1.3;
+
+@page{
+    size:80mm auto;
+    margin:0;
+    display:flex,
+    justify-content: center,
 }
-.c { text-align: center; }
-.r { text-align: right; }
-.b { font-weight: 700; }
-.hdr { font-weight: 700; font-size: 16px; letter-spacing: 1px; }
-.sub { font-size: 10px; color: #444; margin: 1px 0; }
-.dash { border: none; border-top: 1px dashed #999; margin: 4px 0; }
-.thick { border: none; border-top: 2px solid #000; margin: 5px 0; }
-table { width: 100%; border-collapse: collapse; }
-th { border-bottom: 1px solid #000; text-align: left; font-size: 10px; padding: 3px 0; letter-spacing: 0.5px; }
-td { padding: 1.5px 0; font-size: 11px; }
-.lines td { padding: 2px 0; }
-.ret { text-align: center; font-size: 10px; color: #333; line-height: 1.6; font-weight: 600; }
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    width:70mm;
+    margin:0;
+    padding:0mm;
+    font-family:Arial,sans-serif;
+    font-size:11px;
+    color:#000;
+}
+
+.center{
+    text-align:center;
+}
+
+.bold{
+    font-weight:500;
+}
+
+.right{
+    text-align:start;
+}
+
+.header h1{
+    margin:0;
+    font-size:18px;
+}
+
+.header p{
+    margin:2px 0;
+    font-size:11px;
+}
+
+.info{
+    margin-top:8px;
+    line-height:1.1;
+}
+
+.divider{
+    border-top:1px dashed #000;
+    margin:6px 0;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th{
+    text-align:left;
+    border-bottom:1px dashed #000;
+    padding-bottom:3px;
+    font-size:10px;
+}
+
+td{
+    padding:2px 0;
+    font-size:10px;
+    vertical-align:top;
+    text-center: start,
+}
+
+.totals-container{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-top:6px;
+    gap:5px;
+}
+
+.urdu-notes{
+    width:54%;
+    direction:rtl;
+    font-size:10px;
+    line-height:1.2;
+    padding:2px
+}
+
+.calculation{
+    width:46%;
+    font-size:11px;
+}
+
+.calc-row{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:2px;
+}
+
+.total-payable{
+    border-top:1px solid #000;
+    border-bottom:1px solid #000;
+    padding:3px 0;
+    font-weight:bold;
+    margin:4px 0;
+}
+
+.footer{
+    margin-top:8px;
+    font-size:9px;
+}
+
 </style>
+
 </head>
+
 <body>
 
-<div class="c">
-  <div class="hdr">Faraz Pharmacy</div>
-  <div class="sub">Beside Noman Clinical Laboratory, Barikot</div>
+<div class="header center">
+    <h1>FARAZ PHARMACY</h1>
+    <p>Near Civil Hospital Barikot, Swat</p>
+    <p>Phone: 0346-9383792 | 0344-9006940</p>
 </div>
 
-<hr class="dash">
-
-<div style="font-size:10px;">
-  <div>Date: ${dateStr}  ${timeStr}</div>
-  <div>Invoice #: ${sale.id || ""}</div>
-  <div>Customer: ${sale.customer_name || "Walk-in Customer"}</div>
+<div class="info">
+    <div><span class="bold">Invoice #: ${sale.id ?? ""}</span></div>
+    <div><span class="bold">Date: ${dateStr} ${timeStr}</span></div>
+    <div><span class="bold">Customer Name: ${
+      sale.customer_name || "Walk-in Customer"
+    }</span></div>
+    <div><span class="bold">No. of Items : ${items.length}</span> </div>
 </div>
 
-<hr class="dash">
+<div class="divider"></div>
 
 <table>
-  <thead>
-    <tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Amount</th></tr>
-  </thead>
-  <tbody>${itemsHTML}</tbody>
+
+<thead>
+
+<tr>
+<th width="55%">Product Name</th>
+<th width="10%">Qty</th>
+<th width="20%">Price</th>
+<th width="15%" class="right">Amount</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+${itemsHTML}
+
+</tbody>
+
 </table>
 
-<hr class="dash">
+<div class="divider"></div>
 
-<table class="lines">
-  <tr><td style="width:55%">Sub Total</td><td class="r">${Math.round(subtotal)}</td></tr>
-  ${discount > 0 ? `<tr><td>Discount</td><td class="r">-${Math.round(discount)}</td></tr>` : ""}
-  <tr><td>GST (0%)</td><td class="r">${Math.round(gst)}</td></tr>
-  <tr class="b"><td>Total Amount</td><td class="r">${Math.round(totalAmount)}</td></tr>
-</table>
+<div class="totals-container">
 
-<hr class="thick">
+<div class="urdu-notes">
 
-<table class="lines">
-  ${balance > 0 ? `<tr><td style="width:55%">Balance</td><td class="r">${Math.round(balance)}</td></tr>` : ""}
-  ${changeDue > 0 ? `<tr><td style="width:55%">Change</td><td class="r">${Math.round(changeDue)}</td></tr>` : ""}
-</table>
+<div class="bold">ضروری نوٹ</div>
 
-<hr class="dash">
+<div>- رسید کے بغیر کوئی واپسی نہیں</div>
 
-<div class="ret">
-  <b>ضروری نوٹ</b><br>
-  - رسید کے بغیر کوئی واپسی نہیں<br>
-  - دوائیوں کی واپسی ممکن نہیں<br>
-  - 3 دن بعد کوئی واپسی نہیں
+<div>- فریج کی دواؤں کی کوئی واپسی نہیں</div>
+
+<div>- دواؤں کی 3 دن بعد کوئی واپسی نہیں</div>
+
 </div>
 
-<hr class="dash">
+<div class="calculation">
 
-<div class="c" style="font-size:10px; color:#555;">
-  Thank you for your visit !
+<div class="calc-row">
+<span>Total Amount:</span>
+<span>${subtotal}</span>
 </div>
+
+<div class="calc-row">
+<span>Discount:</span>
+<span>${discount}</span>
+</div>
+
+<div class="calc-row">
+<span>GST (0%):</span>
+<span>${gst}</span>
+</div>
+
+<div class="calc-row">
+<span>Arrears:</span>
+<span>${arrears}</span>
+</div>
+
+<div class="total-payable calc-row">
+<span>Total Payable:</span>
+<span>${totalPayable}</span>
+</div>
+
+<div class="calc-row">
+<span>Amount Paid:</span>
+<span>${paid}</span>
+</div>
+
+<div class="calc-row">
+<span>Balance:</span>
+<span>${balance}</span>
+</div>
+
+</div>
+
+</div>
+
+<div class="divider"></div>
+
+<div class="footer center">
+
+www.farsightsystem.com 
+
+</div>
+
+<div class="divider"></div>
 
 </body>
-</html>`;
+
+</html>
+`;
 }
+
+
 
 function generateA4InvoiceHTML(sale) {
   const items = sale.items || [];
